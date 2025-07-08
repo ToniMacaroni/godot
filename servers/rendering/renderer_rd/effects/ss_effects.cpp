@@ -1719,7 +1719,7 @@ void SSEffects::sub_surface_scattering(Ref<RenderSceneBuffersRD> p_render_buffer
 	}
 }
 
-void SSEffects::do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size) {
+void SSEffects::do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength, float p_ca_strength) {
 	UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
 	ERR_FAIL_NULL(uniform_set_cache);
 	MaterialStorage *material_storage = MaterialStorage::get_singleton();
@@ -1730,7 +1730,7 @@ void SSEffects::do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID 
 
 		sharpen.push_constant.screen_size[0] = p_screen_size.x;
 		sharpen.push_constant.screen_size[1] = p_screen_size.y;
-		sharpen.push_constant.strength = 0.02;
+		sharpen.push_constant.strength = p_sharpen_strength;
 
 		RID shader = sharpen.shader.version_get_shader(sharpen.shader_version, 0);
 		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, sharpen.pipelines[0]);
@@ -1751,7 +1751,7 @@ void SSEffects::do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID 
 
 		chromatic_abberation.push_constant.screen_size[0] = p_screen_size.x;
 		chromatic_abberation.push_constant.screen_size[1] = p_screen_size.y;
-		chromatic_abberation.push_constant.strength = 3.0;
+		chromatic_abberation.push_constant.strength = p_ca_strength;
 
 		RID shader = chromatic_abberation.shader.version_get_shader(chromatic_abberation.shader_version, 0);
 		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, chromatic_abberation.pipelines[0]);

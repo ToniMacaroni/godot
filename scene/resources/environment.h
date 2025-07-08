@@ -219,6 +219,8 @@ private:
 	float adjustment_saturation = 1.0;
 	bool use_1d_color_correction = true;
 	Ref<Texture> adjustment_color_correction;
+	float adjustment_sharpen_strength = 0.1;
+	float adjustment_ca_strength = 5.0;
 	void _update_adjustment();
 
 protected:
@@ -441,6 +443,10 @@ public:
 	float get_adjustment_saturation() const;
 	void set_adjustment_color_correction(Ref<Texture> p_color_correction);
 	Ref<Texture> get_adjustment_color_correction() const;
+	void set_sharpen_strength(float p_sharpen_strength);
+	float get_sharpen_strength() const;
+	void set_ca_strength(float p_ca_strength);
+	float get_ca_strength() const;
 
 	Environment();
 	~Environment();

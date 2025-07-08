@@ -1066,6 +1066,24 @@ Ref<Texture> Environment::get_adjustment_color_correction() const {
 	return adjustment_color_correction;
 }
 
+void Environment::set_sharpen_strength(float p_sharpen_strength) {
+	adjustment_sharpen_strength = p_sharpen_strength;
+	_update_adjustment();
+}
+
+float Environment::get_sharpen_strength() const {
+	return adjustment_sharpen_strength;
+}
+
+void Environment::set_ca_strength(float p_ca_strength) {
+	adjustment_ca_strength = p_ca_strength;
+	_update_adjustment();
+}
+
+float Environment::get_ca_strength() const {
+	return adjustment_ca_strength;
+}
+
 void Environment::_update_adjustment() {
 	RID color_correction = adjustment_color_correction.is_valid() ? adjustment_color_correction->get_rid() : RID();
 
@@ -1076,7 +1094,9 @@ void Environment::_update_adjustment() {
 			adjustment_contrast,
 			adjustment_saturation,
 			use_1d_color_correction,
-			color_correction);
+			color_correction,
+			adjustment_sharpen_strength,
+			adjustment_ca_strength);
 }
 
 // Private methods, constructor and destructor
@@ -1519,6 +1539,10 @@ void Environment::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_adjustment_saturation"), &Environment::get_adjustment_saturation);
 	ClassDB::bind_method(D_METHOD("set_adjustment_color_correction", "color_correction"), &Environment::set_adjustment_color_correction);
 	ClassDB::bind_method(D_METHOD("get_adjustment_color_correction"), &Environment::get_adjustment_color_correction);
+	ClassDB::bind_method(D_METHOD("get_sharpen_strength"), &Environment::get_sharpen_strength);
+	ClassDB::bind_method(D_METHOD("set_sharpen_strength", "sharpen_strength"), &Environment::set_sharpen_strength);
+	ClassDB::bind_method(D_METHOD("get_ca_strength"), &Environment::get_ca_strength);
+	ClassDB::bind_method(D_METHOD("set_ca_strength", "ca_strength"), &Environment::set_ca_strength);
 
 	ADD_GROUP("Adjustments", "adjustment_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjustment_enabled", PROPERTY_HINT_GROUP_ENABLE), "set_adjustment_enabled", "is_adjustment_enabled");
@@ -1526,6 +1550,8 @@ void Environment::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_contrast", PROPERTY_HINT_RANGE, "0.01,8,0.01"), "set_adjustment_contrast", "get_adjustment_contrast");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_saturation", PROPERTY_HINT_RANGE, "0.01,8,0.01"), "set_adjustment_saturation", "get_adjustment_saturation");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "adjustment_color_correction", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D,Texture3D"), "set_adjustment_color_correction", "get_adjustment_color_correction");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_sharpen_strength", PROPERTY_HINT_RANGE, "0.0,1,0.01"), "set_sharpen_strength", "get_sharpen_strength");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_ca_strength", PROPERTY_HINT_RANGE, "0.0,20,0.5"), "set_ca_strength", "get_ca_strength");
 
 	// Constants
 
