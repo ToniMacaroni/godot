@@ -151,7 +151,7 @@ public:
 
 	void sub_surface_scattering(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, RID p_depth, const Projection &p_camera, const Size2i &p_screen_size);
 
-	void do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size);
+	void do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength, float p_ca_strength);
 
 private:
 	/* Settings */
