@@ -2448,6 +2448,13 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 			}
 
 			RD::get_singleton()->draw_command_end_label();
+
+			{
+				RENDER_TIMESTAMP("Sharpen & CA");
+				RD::get_singleton()->draw_command_begin_label("Sharpen & CA");
+				ss_effects->do_misc_effects(p_render_data->render_buffers, p_render_data->render_buffers->get_upscaled_texture(), p_render_data->render_buffers->get_internal_size());
+				RD::get_singleton()->draw_command_end_label();
+			}
 		} else if (scale_type == SCALE_MFX) {
 #ifdef METAL_MFXTEMPORAL_ENABLED
 			bool reset = rb_data->ensure_mfx_temporal(mfx_temporal_effect);

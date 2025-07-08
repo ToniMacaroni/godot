@@ -356,6 +356,28 @@ SSEffects::SSEffects() {
 			sss.pipelines[i] = RD::get_singleton()->compute_pipeline_create(sss.shader.version_get_shader(sss.shader_version, i));
 		}
 	}
+
+	{
+		// Sharpen Filter
+		Vector<String> sharpen_modes;
+		sharpen_modes.push_back("\n");
+
+		sharpen.shader.initialize(sharpen_modes);
+		sharpen.shader_version = sharpen.shader.version_create();
+
+		sharpen.pipelines[0] = RD::get_singleton()->compute_pipeline_create(sharpen.shader.version_get_shader(sharpen.shader_version, 0));
+	}
+
+	{
+		// Chromatic Abberation
+		Vector<String> ca_modes;
+		ca_modes.push_back("\n");
+
+		chromatic_abberation.shader.initialize(ca_modes);
+		chromatic_abberation.shader_version = chromatic_abberation.shader.version_create();
+
+		chromatic_abberation.pipelines[0] = RD::get_singleton()->compute_pipeline_create(chromatic_abberation.shader.version_get_shader(chromatic_abberation.shader_version, 0));
+	}
 }
 
 SSEffects::~SSEffects() {
@@ -402,6 +424,12 @@ SSEffects::~SSEffects() {
 	{
 		// Cleanup Subsurface scattering
 		sss.shader.version_free(sss.shader_version);
+	}
+
+	{
+		// Cleanup sharpen
+		sharpen.shader.version_free(sharpen.shader_version);
+		chromatic_abberation.shader.version_free(chromatic_abberation.shader_version);
 	}
 
 	singleton = nullptr;
@@ -1684,6 +1712,55 @@ void SSEffects::sub_surface_scattering(Ref<RenderSceneBuffersRD> p_render_buffer
 
 		sss.push_constant.vertical = true;
 		RD::get_singleton()->compute_list_set_push_constant(compute_list, &sss.push_constant, sizeof(SubSurfaceScatteringPushConstant));
+
+		RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.width, p_screen_size.height, 1);
+
+		RD::get_singleton()->compute_list_end();
+	}
+}
+
+void SSEffects::do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size) {
+	UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
+	ERR_FAIL_NULL(uniform_set_cache);
+	MaterialStorage *material_storage = MaterialStorage::get_singleton();
+	ERR_FAIL_NULL(material_storage);
+
+	{
+		RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
+
+		sharpen.push_constant.screen_size[0] = p_screen_size.x;
+		sharpen.push_constant.screen_size[1] = p_screen_size.y;
+		sharpen.push_constant.strength = 0.02;
+
+		RID shader = sharpen.shader.version_get_shader(sharpen.shader_version, 0);
+		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, sharpen.pipelines[0]);
+
+		RD::Uniform u_diffuse(RD::UNIFORM_TYPE_IMAGE, 0, Vector<RID>({ p_diffuse }));
+
+		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse), 0);
+
+		RD::get_singleton()->compute_list_set_push_constant(compute_list, &sharpen.push_constant, sizeof(GenericPushConstant));
+
+		RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.width, p_screen_size.height, 1);
+
+		RD::get_singleton()->compute_list_end();
+	}
+
+	{
+		RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
+
+		chromatic_abberation.push_constant.screen_size[0] = p_screen_size.x;
+		chromatic_abberation.push_constant.screen_size[1] = p_screen_size.y;
+		chromatic_abberation.push_constant.strength = 3.0;
+
+		RID shader = chromatic_abberation.shader.version_get_shader(chromatic_abberation.shader_version, 0);
+		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, chromatic_abberation.pipelines[0]);
+
+		RD::Uniform u_diffuse(RD::UNIFORM_TYPE_IMAGE, 0, Vector<RID>({ p_diffuse }));
+
+		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse), 0);
+
+		RD::get_singleton()->compute_list_set_push_constant(compute_list, &chromatic_abberation.push_constant, sizeof(GenericPushConstant));
 
 		RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.width, p_screen_size.height, 1);
 

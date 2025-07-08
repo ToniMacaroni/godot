@@ -43,6 +43,8 @@
 #include "servers/rendering/renderer_rd/shaders/effects/ssil_importance_map.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/ssil_interleave.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/subsurface_scattering.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/sharpen.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/chromatic_abberation.glsl.gen.h"
 #include "servers/rendering_server.h"
 
 #define RB_SCOPE_SSDS SNAME("rb_ssds")
@@ -148,6 +150,8 @@ public:
 	void sss_set_scale(float p_scale, float p_depth_scale);
 
 	void sub_surface_scattering(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, RID p_depth, const Projection &p_camera, const Size2i &p_screen_size);
+
+	void do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size);
 
 private:
 	/* Settings */
@@ -523,6 +527,26 @@ private:
 		RID shader_version;
 		RID pipelines[3]; //3 quality levels
 	} sss;
+
+	struct GenericPushConstant {
+		int32_t screen_size[2];
+		float strength;
+		int32_t pad;
+	};
+
+	struct Sharpen {
+		GenericPushConstant push_constant;
+		SharpenShaderRD shader;
+		RID shader_version;
+		RID pipelines[1];
+	} sharpen;
+
+	struct ChromaticAbberation {
+		GenericPushConstant push_constant;
+		ChromaticAbberationShaderRD shader;
+		RID shader_version;
+		RID pipelines[1];
+	} chromatic_abberation;
 };
 
 } // namespace RendererRD
