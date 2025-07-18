@@ -316,6 +316,10 @@ public:
 	virtual bool environment_get_use_1d_color_correction(RID p_env) const = 0;
 	virtual RID environment_get_color_correction(RID p_env) const = 0;
 
+	virtual void environment_set_cs(RID p_env, float thickness, float max_dist, float opacity) = 0;
+	virtual float environment_get_cs_thickness(RID p_env) const = 0;
+	virtual float environment_get_cs_max_dist(RID p_env) const = 0;
+
 	virtual Ref<Image> environment_bake_panorama(RID p_env, bool p_bake_irradiance, const Size2i &p_size) = 0;
 
 	virtual bool is_environment(RID p_environment) const = 0;

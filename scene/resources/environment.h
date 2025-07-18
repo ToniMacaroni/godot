@@ -222,6 +222,12 @@ private:
 	float adjustment_sharpen_strength = 0.1;
 	float adjustment_ca_strength = 5.0;
 	void _update_adjustment();
+	void _update_cs();
+
+	// Contact Shadows
+	float cs_thickness = 0.1f;
+	float cs_max_dist = 0.1f;
+	float cs_opacity = 0.8f;
 
 protected:
 	static void _bind_methods();
@@ -447,6 +453,14 @@ public:
 	float get_sharpen_strength() const;
 	void set_ca_strength(float p_ca_strength);
 	float get_ca_strength() const;
+
+	// Contact Shadows
+	void set_cs_thickness(float thickness);
+	float get_cs_thickness() const;
+	void set_cs_max_dist(float max_dist);
+	float get_cs_max_dist() const;
+	void set_cs_opacity(float opacity);
+	float get_cs_opacity() const;
 
 	Environment();
 	~Environment();

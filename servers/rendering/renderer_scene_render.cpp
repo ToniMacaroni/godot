@@ -730,3 +730,19 @@ float RendererSceneRender::environment_get_sharpen_strength(RID p_env) const {
 float RendererSceneRender::environment_get_ca_strength(RID p_env) const {
 	return environment_storage.environment_get_ca_strength(p_env);
 }
+
+void RendererSceneRender::environment_set_cs(RID p_env, float thickness, float max_dist, float opacity) {
+	environment_storage.environment_set_cs(p_env, thickness, max_dist, opacity);
+}
+
+float RendererSceneRender::environment_get_cs_thickness(RID p_env) const {
+	return environment_storage.environment_get_cs_thickness(p_env);
+}
+
+float RendererSceneRender::environment_get_cs_max_dist(RID p_env) const {
+	return environment_storage.environment_get_cs_max_dist(p_env);
+}
+
+float RendererSceneRender::environment_get_cs_opacity(RID p_env) const {
+	return environment_storage.environment_get_cs_opacity(p_env);
+}

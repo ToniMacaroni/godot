@@ -155,6 +155,11 @@ private:
 		RID color_correction;
 		float sharpen_strength = 0.1f;
 		float ca_strength = 5.0f;
+
+		// CS
+		float cs_thickness = 0.1f;
+		float cs_max_dist = 0.1f;
+		float cs_opacity = 0.8f;
 	};
 
 	mutable RID_Owner<Environment, true> environment_owner;
@@ -307,4 +312,10 @@ public:
 	RID environment_get_color_correction(RID p_env) const;
 	float environment_get_sharpen_strength(RID p_env) const;
 	float environment_get_ca_strength(RID p_env) const;
+
+	// CS
+	void environment_set_cs(RID p_env, float thickness, float max_dist, float opacity);
+	float environment_get_cs_thickness(RID p_env) const;
+	float environment_get_cs_max_dist(RID p_env) const;
+	float environment_get_cs_opacity(RID p_env) const;
 };

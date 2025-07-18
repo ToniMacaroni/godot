@@ -1084,6 +1084,33 @@ float Environment::get_ca_strength() const {
 	return adjustment_ca_strength;
 }
 
+void Environment::set_cs_thickness(float thickness) {
+	cs_thickness = thickness;
+	_update_cs();
+}
+
+float Environment::get_cs_thickness() const {
+	return cs_thickness;
+}
+
+void Environment::set_cs_max_dist(float max_dist) {
+	cs_max_dist = max_dist;
+	_update_cs();
+}
+
+float Environment::get_cs_max_dist() const {
+	return cs_max_dist;
+}
+
+void Environment::set_cs_opacity(float opacity) {
+	cs_opacity = opacity;
+	_update_cs();
+}
+
+float Environment::get_cs_opacity() const {
+	return cs_opacity;
+}
+
 void Environment::_update_adjustment() {
 	RID color_correction = adjustment_color_correction.is_valid() ? adjustment_color_correction->get_rid() : RID();
 
@@ -1097,6 +1124,14 @@ void Environment::_update_adjustment() {
 			color_correction,
 			adjustment_sharpen_strength,
 			adjustment_ca_strength);
+}
+
+void Environment::_update_cs() {
+	RS::get_singleton()->environment_set_cs(
+		environment,
+		cs_thickness,
+		cs_max_dist,
+		cs_opacity);
 }
 
 // Private methods, constructor and destructor
@@ -1552,6 +1587,18 @@ void Environment::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "adjustment_color_correction", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D,Texture3D"), "set_adjustment_color_correction", "get_adjustment_color_correction");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_sharpen_strength", PROPERTY_HINT_RANGE, "0.0,1,0.01"), "set_sharpen_strength", "get_sharpen_strength");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_ca_strength", PROPERTY_HINT_RANGE, "0.0,20,0.5"), "set_ca_strength", "get_ca_strength");
+
+	ClassDB::bind_method(D_METHOD("set_cs_thickness", "thickness"), &Environment::set_cs_thickness);
+	ClassDB::bind_method(D_METHOD("get_cs_thickness"), &Environment::get_cs_thickness);
+	ClassDB::bind_method(D_METHOD("set_cs_max_dist", "max_dist"), &Environment::set_cs_max_dist);
+	ClassDB::bind_method(D_METHOD("get_cs_max_dist"), &Environment::get_cs_max_dist);
+	ClassDB::bind_method(D_METHOD("set_cs_opacity"), &Environment::set_cs_opacity);
+	ClassDB::bind_method(D_METHOD("get_cs_opacity"), &Environment::get_cs_opacity);
+
+	ADD_GROUP("Contact Shadows", "cs_");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_thickness", PROPERTY_HINT_RANGE, "0.00,1.0,0.01"), "set_cs_thickness", "get_cs_thickness");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_max_dist", PROPERTY_HINT_RANGE, "0.00,1.0,0.01"), "set_cs_max_dist", "get_cs_max_dist");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_opacity", PROPERTY_HINT_RANGE, "0.00,1.0,0.01"), "set_cs_opacity", "get_cs_opacity");
 
 	// Constants
 
