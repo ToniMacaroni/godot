@@ -45,6 +45,7 @@
 #include "servers/rendering/renderer_rd/shaders/effects/subsurface_scattering.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/sharpen.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/chromatic_abberation.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/screen_space_shadows.glsl.gen.h"
 #include "servers/rendering_server.h"
 
 #define RB_SCOPE_SSDS SNAME("rb_ssds")
@@ -152,6 +153,7 @@ public:
 	void sub_surface_scattering(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, RID p_depth, const Projection &p_camera, const Size2i &p_screen_size);
 
 	void do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength, float p_ca_strength);
+	void gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buffers, float p_thickness, float p_max_dist, float p_opacity, Transform3D light_dir, Projection p_projection, Transform3D p_view);
 
 private:
 	/* Settings */
@@ -528,25 +530,59 @@ private:
 		RID pipelines[3]; //3 quality levels
 	} sss;
 
-	struct GenericPushConstant {
+	struct SharpenPushConstant {
 		int32_t screen_size[2];
 		float strength;
 		int32_t pad;
 	};
 
 	struct Sharpen {
-		GenericPushConstant push_constant;
+		SharpenPushConstant push_constant;
 		SharpenShaderRD shader;
 		RID shader_version;
 		RID pipelines[1];
 	} sharpen;
 
+	struct ChromaticAbberationPushConstant {
+    	float screen_size_rcp[2];
+    	float strength;
+    	int32_t pad;
+    };
+
 	struct ChromaticAbberation {
-		GenericPushConstant push_constant;
+		ChromaticAbberationPushConstant push_constant;
 		ChromaticAbberationShaderRD shader;
 		RID shader_version;
 		RID pipelines[1];
 	} chromatic_abberation;
+
+	struct ScreenSpaceShadowsPushConstant {
+		float screen_size_rcp[2];
+		float screen_size[2];
+
+		float light_dir[3];
+		float thickness;
+
+		float max_dist;
+		float opacity;
+
+		uint32_t pad[2];
+	};
+
+	struct ScreenSpaceShadowsData {
+		float proj[16];
+		float proj_inv[16];
+		float view[16];
+		float view_inv[16];
+	};
+
+	struct ScreenSpaceShadows {
+		ScreenSpaceShadowsPushConstant push_constant;
+		ScreenSpaceShadowsShaderRD shader;
+		RID shader_version;
+		RID pipelines[1];
+		RID ubo;
+	} screen_space_shadows;
 };
 
 } // namespace RendererRD
