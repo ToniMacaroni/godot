@@ -75,9 +75,6 @@
 #if defined(D3D12_ENABLED)
 #include "drivers/d3d12/rendering_context_driver_d3d12.h"
 #endif
-#if defined(GLES3_ENABLED)
-#include "drivers/gles3/rasterizer_gles3.h"
-#endif
 
 #ifdef DEBUG_ENABLED
 #pragma pack(push, before_imagehlp, 8)
@@ -2624,14 +2621,6 @@ bool OS_Windows::_test_create_rendering_device_and_gl(const String &p_display_dr
 	}
 
 	bool ok = true;
-#ifdef GLES3_ENABLED
-	GLManagerNative_Windows *test_gl_manager_native = memnew(GLManagerNative_Windows);
-	if (test_gl_manager_native->window_create(DisplayServer::MAIN_WINDOW_ID, hWnd, GetModuleHandle(nullptr), 800, 600) == OK) {
-		RasterizerGLES3::make_current(true);
-	} else {
-		ok = false;
-	}
-#endif
 
 	MSG msg = {};
 	while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -2642,12 +2631,6 @@ bool OS_Windows::_test_create_rendering_device_and_gl(const String &p_display_dr
 	if (ok) {
 		ok = _test_create_rendering_device(p_display_driver);
 	}
-
-#ifdef GLES3_ENABLED
-	if (test_gl_manager_native) {
-		memdelete(test_gl_manager_native);
-	}
-#endif
 
 	DestroyWindow(hWnd);
 	UnregisterClassW(L"Engine probe window", GetModuleHandle(nullptr));
