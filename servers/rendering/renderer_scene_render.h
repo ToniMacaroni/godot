@@ -256,6 +256,12 @@ public:
 	float environment_get_sharpen_strength(RID p_env) const;
 	float environment_get_ca_strength(RID p_env) const;
 
+	// CS
+	void environment_set_cs(RID p_env, float thickness, float max_dist, float opacity);
+	float environment_get_cs_thickness(RID p_env) const;
+	float environment_get_cs_max_dist(RID p_env) const;
+	float environment_get_cs_opacity(RID p_env) const;
+
 	virtual Ref<Image> environment_bake_panorama(RID p_env, bool p_bake_irradiance, const Size2i &p_size) = 0;
 
 	virtual void positional_soft_shadow_filter_set_quality(RS::ShadowQuality p_quality) = 0;

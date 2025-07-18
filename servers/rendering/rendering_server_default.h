@@ -826,6 +826,8 @@ public:
 
 	FUNC9(environment_set_adjustment, RID, bool, float, float, float, bool, RID, float, float)
 
+	FUNC4(environment_set_cs, RID, float, float, float)
+
 	FUNC11(environment_set_fog, RID, bool, const Color &, float, float, float, float, float, float, float, EnvironmentFogMode)
 
 	FUNC4(environment_set_fog_depth, RID, float, float, float)
