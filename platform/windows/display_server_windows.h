@@ -54,11 +54,6 @@
 #include "servers/rendering/rendering_device.h"
 #endif
 
-#if defined(GLES3_ENABLED)
-#include "gl_manager_windows_angle.h"
-#include "gl_manager_windows_native.h"
-#endif // GLES3_ENABLED
-
 #include "native_menu_windows.h"
 
 #include <io.h>
@@ -261,11 +256,6 @@ class DisplayServerWindows : public DisplayServer {
 	bool old_invalid;
 	int old_x, old_y;
 	Point2i center;
-
-#if defined(GLES3_ENABLED)
-	GLManagerANGLE_Windows *gl_manager_angle = nullptr;
-	GLManagerNative_Windows *gl_manager_native = nullptr;
-#endif
 
 #if defined(RD_ENABLED)
 	RenderingContextDriver *rendering_context = nullptr;
