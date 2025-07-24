@@ -2392,6 +2392,13 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 		_process_compositor_effects(RS::COMPOSITOR_EFFECT_CALLBACK_TYPE_POST_TRANSPARENT, p_render_data);
 	}
 
+	{
+		RENDER_TIMESTAMP("Sharpen");
+		RD::get_singleton()->draw_command_begin_label("Sharpen");
+		ss_effects->do_sharpen(rb->get_internal_texture(), rb->get_internal_size(), environment_get_sharpen_strength(p_render_data->environment));
+		RD::get_singleton()->draw_command_end_label();
+	}
+
 	RD::get_singleton()->draw_command_begin_label("Copy framebuffer for SSIL");
 	if (using_ssil) {
 		RENDER_TIMESTAMP("Copy Final Framebuffer (SSIL)");
@@ -2472,9 +2479,9 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 			if(p_render_data->environment.is_valid())
 			{
-				RENDER_TIMESTAMP("Sharpen & CA");
-				RD::get_singleton()->draw_command_begin_label("Sharpen & CA");
-				ss_effects->do_misc_effects(rb, rb->get_upscaled_texture(), rb->get_target_size(), environment_get_sharpen_strength(p_render_data->environment), environment_get_ca_strength(p_render_data->environment));
+				RENDER_TIMESTAMP("CA");
+				RD::get_singleton()->draw_command_begin_label("CA");
+				ss_effects->do_ca(rb->get_upscaled_texture(), rb->get_target_size(), environment_get_ca_strength(p_render_data->environment));
 				RD::get_singleton()->draw_command_end_label();
 			}
 		} else if (scale_type == SCALE_MFX) {
@@ -2514,9 +2521,9 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 			if(p_render_data->environment.is_valid())
 			{
-				RENDER_TIMESTAMP("Sharpen & CA");
-				RD::get_singleton()->draw_command_begin_label("Sharpen & CA");
-				ss_effects->do_misc_effects(rb, rb->get_internal_texture(), rb->get_internal_size(), environment_get_sharpen_strength(p_render_data->environment), environment_get_ca_strength(p_render_data->environment));
+				RENDER_TIMESTAMP("CA");
+				RD::get_singleton()->draw_command_begin_label("CA");
+				ss_effects->do_ca(rb->get_internal_texture(), rb->get_internal_size(), environment_get_ca_strength(p_render_data->environment));
 				RD::get_singleton()->draw_command_end_label();
 			}
 		}
