@@ -1738,34 +1738,13 @@ void SSEffects::sub_surface_scattering(Ref<RenderSceneBuffersRD> p_render_buffer
 	}
 }
 
-void SSEffects::do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength, float p_ca_strength) {
+void SSEffects::do_ca(RID p_diffuse, const Size2i &p_screen_size, float p_ca_strength) {
 	UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
 	ERR_FAIL_NULL(uniform_set_cache);
 	MaterialStorage *material_storage = MaterialStorage::get_singleton();
 	ERR_FAIL_NULL(material_storage);
 
 	RID default_sampler = material_storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
-
-	{
-		RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
-
-		sharpen.push_constant.screen_size[0] = p_screen_size.x;
-		sharpen.push_constant.screen_size[1] = p_screen_size.y;
-		sharpen.push_constant.strength = p_sharpen_strength;
-
-		RID shader = sharpen.shader.version_get_shader(sharpen.shader_version, 0);
-		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, sharpen.pipelines[0]);
-
-		RD::Uniform u_diffuse(RD::UNIFORM_TYPE_IMAGE, 0, Vector<RID>({ p_diffuse }));
-
-		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse), 0);
-
-		RD::get_singleton()->compute_list_set_push_constant(compute_list, &sharpen.push_constant, sizeof(SharpenPushConstant));
-
-		RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.width, p_screen_size.height, 1);
-
-		RD::get_singleton()->compute_list_end();
-	}
 
 	if(p_ca_strength > 0.1f) {
 		RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
@@ -1784,6 +1763,36 @@ void SSEffects::do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID 
 		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 1, u_diffuse), 1);
 
 		RD::get_singleton()->compute_list_set_push_constant(compute_list, &chromatic_abberation.push_constant, sizeof(ChromaticAbberationPushConstant));
+
+		RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.width, p_screen_size.height, 1);
+
+		RD::get_singleton()->compute_list_end();
+	}
+}
+
+void SSEffects::do_sharpen(RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength) {
+
+	if(p_sharpen_strength < 0.01f)
+		return;
+
+	UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
+	ERR_FAIL_NULL(uniform_set_cache);
+
+	{
+		RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
+
+		sharpen.push_constant.screen_size[0] = p_screen_size.x;
+		sharpen.push_constant.screen_size[1] = p_screen_size.y;
+		sharpen.push_constant.strength = p_sharpen_strength;
+
+		RID shader = sharpen.shader.version_get_shader(sharpen.shader_version, 0);
+		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, sharpen.pipelines[0]);
+
+		RD::Uniform u_diffuse(RD::UNIFORM_TYPE_IMAGE, 0, Vector<RID>({ p_diffuse }));
+
+		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse), 0);
+
+		RD::get_singleton()->compute_list_set_push_constant(compute_list, &sharpen.push_constant, sizeof(SharpenPushConstant));
 
 		RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.width, p_screen_size.height, 1);
 

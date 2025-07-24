@@ -152,7 +152,8 @@ public:
 
 	void sub_surface_scattering(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, RID p_depth, const Projection &p_camera, const Size2i &p_screen_size);
 
-	void do_misc_effects(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength, float p_ca_strength);
+	void do_ca(RID p_diffuse, const Size2i &p_screen_size, float p_ca_strength);
+	void do_sharpen(RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength);
 	void gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buffers, float p_thickness, float p_max_dist, float p_opacity, Transform3D light_dir, Projection p_projection, Transform3D p_view);
 
 private:
