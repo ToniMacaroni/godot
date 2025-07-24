@@ -1585,7 +1585,7 @@ void Environment::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_contrast", PROPERTY_HINT_RANGE, "0.01,8,0.01"), "set_adjustment_contrast", "get_adjustment_contrast");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_saturation", PROPERTY_HINT_RANGE, "0.01,8,0.01"), "set_adjustment_saturation", "get_adjustment_saturation");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "adjustment_color_correction", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D,Texture3D"), "set_adjustment_color_correction", "get_adjustment_color_correction");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_sharpen_strength", PROPERTY_HINT_RANGE, "0.0,1,0.01"), "set_sharpen_strength", "get_sharpen_strength");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_sharpen_strength", PROPERTY_HINT_RANGE, "0,10,0.1"), "set_sharpen_strength", "get_sharpen_strength");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "adjustment_ca_strength", PROPERTY_HINT_RANGE, "0.0,20,0.5"), "set_ca_strength", "get_ca_strength");
 
 	ClassDB::bind_method(D_METHOD("set_cs_thickness", "thickness"), &Environment::set_cs_thickness);
