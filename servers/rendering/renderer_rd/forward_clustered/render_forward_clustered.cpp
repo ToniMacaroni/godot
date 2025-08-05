@@ -2392,7 +2392,13 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 		_process_compositor_effects(RS::COMPOSITOR_EFFECT_CALLBACK_TYPE_POST_TRANSPARENT, p_render_data);
 	}
 
+	if(p_render_data->environment.is_valid())
 	{
+		RENDER_TIMESTAMP("CA");
+			RD::get_singleton()->draw_command_begin_label("CA");
+			ss_effects->do_ca(rb->get_internal_texture(), rb->get_internal_size(), environment_get_ca_strength(p_render_data->environment));
+			RD::get_singleton()->draw_command_end_label();
+
 		RENDER_TIMESTAMP("Sharpen");
 		RD::get_singleton()->draw_command_begin_label("Sharpen");
 		ss_effects->do_sharpen(rb->get_internal_texture(), rb->get_internal_size(), environment_get_sharpen_strength(p_render_data->environment));
@@ -2477,13 +2483,13 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 			RD::get_singleton()->draw_command_end_label();
 
-			if(p_render_data->environment.is_valid())
-			{
-				RENDER_TIMESTAMP("CA");
-				RD::get_singleton()->draw_command_begin_label("CA");
-				ss_effects->do_ca(rb->get_upscaled_texture(), rb->get_target_size(), environment_get_ca_strength(p_render_data->environment));
-				RD::get_singleton()->draw_command_end_label();
-			}
+			// if(p_render_data->environment.is_valid())
+			// {
+			// 	RENDER_TIMESTAMP("CA");
+			// 	RD::get_singleton()->draw_command_begin_label("CA");
+			// 	ss_effects->do_ca(rb->get_upscaled_texture(), rb->get_target_size(), environment_get_ca_strength(p_render_data->environment));
+			// 	RD::get_singleton()->draw_command_end_label();
+			// }
 		} else if (scale_type == SCALE_MFX) {
 #ifdef METAL_MFXTEMPORAL_ENABLED
 			bool reset = rb_data->ensure_mfx_temporal(mfx_temporal_effect);
@@ -2519,13 +2525,13 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 			taa->process(rb, _render_buffers_get_color_format(), p_render_data->scene_data->z_near, p_render_data->scene_data->z_far);
 			RD::get_singleton()->draw_command_end_label();
 
-			if(p_render_data->environment.is_valid())
-			{
-				RENDER_TIMESTAMP("CA");
-				RD::get_singleton()->draw_command_begin_label("CA");
-				ss_effects->do_ca(rb->get_internal_texture(), rb->get_internal_size(), environment_get_ca_strength(p_render_data->environment));
-				RD::get_singleton()->draw_command_end_label();
-			}
+			// if(p_render_data->environment.is_valid())
+			// {
+			// 	RENDER_TIMESTAMP("CA");
+			// 	RD::get_singleton()->draw_command_begin_label("CA");
+			// 	ss_effects->do_ca(rb->get_internal_texture(), rb->get_internal_size(), environment_get_ca_strength(p_render_data->environment));
+			// 	RD::get_singleton()->draw_command_end_label();
+			// }
 		}
 	}
 
