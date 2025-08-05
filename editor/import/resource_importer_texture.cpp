@@ -255,6 +255,9 @@ void ResourceImporterTexture::get_import_options(const String &p_path, List<Impo
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "process/normal_map_invert_y"), false));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "process/hdr_as_srgb"), false));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "process/hdr_clamp_exposure"), false));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::FLOAT, "adjustments/saturation", PROPERTY_HINT_RANGE, "0,2,0.001"), 1.f));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::FLOAT, "adjustments/contrast", PROPERTY_HINT_RANGE, "0,2,0.001"), 1.f));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::FLOAT, "adjustments/brightness", PROPERTY_HINT_RANGE, "0,2,0.001"), 1.f));
 
 	// Maximum bound is the highest allowed value for lossy compression (the lowest common denominator).
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "process/size_limit", PROPERTY_HINT_RANGE, "0,16383,1"), 0));
@@ -766,6 +769,11 @@ Error ResourceImporterTexture::import(ResourceUID::ID p_source_id, const String 
 	bool use_editor_scale = p_options.has("editor/scale_with_editor_scale") && p_options["editor/scale_with_editor_scale"];
 	bool convert_editor_colors = p_options.has("editor/convert_colors_with_editor_theme") && p_options["editor/convert_colors_with_editor_theme"];
 
+	// Adjustments
+	float saturationvalue = p_options.has("adjustments/saturation") ? float(p_options["adjustments/saturation"]) : 1.0f;
+	float contrastvalue = p_options.has("adjustments/contrast") ? float(p_options["adjustments/contrast"]) : 1.0f;
+	float brightnessvalue = p_options.has("adjustments/brightness") ? float(p_options["adjustments/brightness"]) : 1.0f;
+
 	if (hdr_as_srgb) {
 		loader_flags |= ImageFormatLoader::FLAG_FORCE_LINEAR;
 	}
@@ -876,6 +884,10 @@ Error ResourceImporterTexture::import(ResourceUID::ID p_source_id, const String 
 		// Clamp HDR exposure.
 		if (hdr_clamp_exposure) {
 			_clamp_hdr_exposure(target_image);
+		}
+
+		if (saturationvalue != 1.f || contrastvalue != 1.f || brightnessvalue != 1.f) {
+			target_image->adjust_bcs(brightnessvalue, contrastvalue, saturationvalue);
 		}
 	}
 
