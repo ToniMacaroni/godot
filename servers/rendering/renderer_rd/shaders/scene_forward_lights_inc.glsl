@@ -200,11 +200,10 @@ void light_compute(half vertz, hvec3 N, hvec3 L, hvec3 V, half A, hvec3 light_co
 			// lambert
 			diffuse_brdf_NL = cNdotL * half(1.0 / M_PI);
 #endif
-        float modu = mix(0.35, 0., clamp(vertz*0.025, 0., 1.));
-			diffuse_light += light_color * diffuse_brdf_NL * max(attenuation, min(0.45, modu));
+			diffuse_light += light_color * diffuse_brdf_NL * attenuation;
 
 #if defined(LIGHT_BACKLIGHT_USED)
-			diffuse_light += light_color * (hvec3(1.0 / M_PI) - diffuse_brdf_NL) * backlight * max(attenuation, min(0.45, modu));
+			diffuse_light += light_color * (hvec3(1.0 / M_PI) - diffuse_brdf_NL) * backlight * attenuation;
 #endif
 		}
 
