@@ -546,8 +546,9 @@ private:
 
 	struct ChromaticAbberationPushConstant {
     	float screen_size_rcp[2];
+		int32_t screen_size[2];
     	float strength;
-    	int32_t pad;
+    	int32_t pad[3];
     };
 
 	struct ChromaticAbberation {
