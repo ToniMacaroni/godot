@@ -1751,16 +1751,18 @@ void SSEffects::do_ca(RID p_diffuse, const Size2i &p_screen_size, float p_ca_str
 
 		chromatic_abberation.push_constant.screen_size_rcp[0] = 1.0f / p_screen_size.x;
 		chromatic_abberation.push_constant.screen_size_rcp[1] = 1.0f / p_screen_size.y;
+		chromatic_abberation.push_constant.screen_size[0] = p_screen_size.x;
+		chromatic_abberation.push_constant.screen_size[1] = p_screen_size.y;
 		chromatic_abberation.push_constant.strength = p_ca_strength;
 
 		RID shader = chromatic_abberation.shader.version_get_shader(chromatic_abberation.shader_version, 0);
 		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, chromatic_abberation.pipelines[0]);
 
 		RD::Uniform u_diffuse(RD::UNIFORM_TYPE_IMAGE, 0, Vector<RID>({ p_diffuse }));
-		RD::Uniform u_diffuse_with_sampler(RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, Vector<RID>({ default_sampler, p_diffuse }));
+		// RD::Uniform u_diffuse_with_sampler(RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, Vector<RID>({ default_sampler, p_diffuse }));
 
-		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse_with_sampler), 0);
-		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 1, u_diffuse), 1);
+		// RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse_with_sampler), 0);
+		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse), 0);
 
 		RD::get_singleton()->compute_list_set_push_constant(compute_list, &chromatic_abberation.push_constant, sizeof(ChromaticAbberationPushConstant));
 

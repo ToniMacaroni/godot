@@ -2395,9 +2395,9 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	if(p_render_data->environment.is_valid())
 	{
 		RENDER_TIMESTAMP("CA");
-			RD::get_singleton()->draw_command_begin_label("CA");
-			ss_effects->do_ca(rb->get_internal_texture(), rb->get_internal_size(), environment_get_ca_strength(p_render_data->environment));
-			RD::get_singleton()->draw_command_end_label();
+		RD::get_singleton()->draw_command_begin_label("CA");
+		ss_effects->do_ca(rb->get_internal_texture(), rb->get_internal_size(), environment_get_ca_strength(p_render_data->environment));
+		RD::get_singleton()->draw_command_end_label();
 
 		RENDER_TIMESTAMP("Sharpen");
 		RD::get_singleton()->draw_command_begin_label("Sharpen");
@@ -2412,28 +2412,28 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	}
 	RD::get_singleton()->draw_command_end_label();
 
-	if (p_render_data->environment.is_valid()) {
-
-		RID directional_light;
-		for (int i = 0; i < p_render_data->render_shadow_count; i++) {
-			RID li = p_render_data->render_shadows[i].light;
-			RID base = light_storage->light_instance_get_base_light(li);
-
-			if (light_storage->light_get_type(base) == RS::LIGHT_DIRECTIONAL) {
-				directional_light = li;
-			}
-		}
-
-		if(directional_light.is_valid()) {
-			RD::get_singleton()->draw_command_begin_label("ScreenSpaceShadows");
-			RENDER_TIMESTAMP("ScreenSpaceShadows");
-			Projection correction;
-			correction.set_depth_correction(true);
-			correction.add_jitter_offset(p_render_data->scene_data->taa_jitter);
-			ss_effects->gen_screen_space_shadows(rb, environment_get_cs_thickness(p_render_data->environment), environment_get_cs_max_dist(p_render_data->environment), environment_get_cs_opacity(p_render_data->environment), light_storage->light_instance_get_base_transform(directional_light), correction * p_render_data->scene_data->view_projection[0], p_render_data->scene_data->cam_transform);
-			RD::get_singleton()->draw_command_end_label();
-		}
-	}
+	// if (p_render_data->environment.is_valid()) {
+	//
+	// 	RID directional_light;
+	// 	for (int i = 0; i < p_render_data->render_shadow_count; i++) {
+	// 		RID li = p_render_data->render_shadows[i].light;
+	// 		RID base = light_storage->light_instance_get_base_light(li);
+	//
+	// 		if (light_storage->light_get_type(base) == RS::LIGHT_DIRECTIONAL) {
+	// 			directional_light = li;
+	// 		}
+	// 	}
+	//
+	// 	if(directional_light.is_valid()) {
+	// 		RD::get_singleton()->draw_command_begin_label("ScreenSpaceShadows");
+	// 		RENDER_TIMESTAMP("ScreenSpaceShadows");
+	// 		Projection correction;
+	// 		correction.set_depth_correction(true);
+	// 		correction.add_jitter_offset(p_render_data->scene_data->taa_jitter);
+	// 		ss_effects->gen_screen_space_shadows(rb, environment_get_cs_thickness(p_render_data->environment), environment_get_cs_max_dist(p_render_data->environment), environment_get_cs_opacity(p_render_data->environment), light_storage->light_instance_get_base_transform(directional_light), correction * p_render_data->scene_data->view_projection[0], p_render_data->scene_data->cam_transform);
+	// 		RD::get_singleton()->draw_command_end_label();
+	// 	}
+	// }
 
 	if (rb_data.is_valid() && (using_upscaling || using_taa)) {
 		if (scale_type == SCALE_FSR2) {
