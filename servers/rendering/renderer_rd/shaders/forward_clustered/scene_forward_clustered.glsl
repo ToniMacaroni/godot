@@ -1134,6 +1134,24 @@ vec3 encode24(vec3 v) {
 }
 #endif // MODE_RENDER_NORMAL_ROUGHNESS
 
+vec2 random2(vec2 st){
+    st = vec2( dot(st,vec2(127.1,311.7)),
+              dot(st,vec2(269.5,183.3)) );
+    return -1.0 + 2.0*fract(sin(st)*43758.5453123);
+}
+
+float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+
+    vec2 u = f*f*(3.0-2.0*f);
+
+    return mix( mix( dot( random2(i + vec2(0.0,0.0) ), f - vec2(0.0,0.0) ),
+                     dot( random2(i + vec2(1.0,0.0) ), f - vec2(1.0,0.0) ), u.x),
+                mix( dot( random2(i + vec2(0.0,1.0) ), f - vec2(0.0,1.0) ),
+                     dot( random2(i + vec2(1.0,1.0) ), f - vec2(1.0,1.0) ), u.x), u.y);
+}
+
 void fragment_shader(in SceneData scene_data) {
 	uint instance_index = instance_index_interp;
 
@@ -2333,6 +2351,14 @@ void fragment_shader(in SceneData scene_data) {
 							float shadow2 = sample_directional_pcf_shadow(directional_shadow_atlas, scene_data.directional_shadow_pixel_size * directional_lights.data[i].soft_shadow_scale * (blur_factor2 + (1.0 - blur_factor2) * float(directional_lights.data[i].blend_splits)), pssm_coord, scene_data.taa_frame_count);
 							shadow = mix(shadow, shadow2, pssm_blend);
 						}
+
+                        vec4 wpos = inv_view_matrix * vec4(vertex, 1.0);
+                        wpos.xz += global_time * 2.5;
+
+                        float n1 = noise(wpos.xz * 0.02);
+                        float n2 = noise(wpos.xz * 0.01 + n1 * .7);
+
+                        shadow *= clamp(smoothstep(-.25, .1, n2), 0.4, 1.);
 					}
 
 #ifdef USE_LIGHTMAP
