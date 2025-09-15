@@ -75,6 +75,10 @@ layout(push_constant, std430) uniform Params {
 
 	vec2 pixel_size;
 	uint tonemapper;
+    float tonemap_a;
+    float tonemap_b;
+    float tonemap_c;
+    float tonemap_d;
 	uint pad;
 
 	uvec2 glow_texture_size;
@@ -85,9 +89,10 @@ layout(push_constant, std430) uniform Params {
 	float glow_levels[7];
 
 	float exposure;
-	float white;
 	float auto_exposure_scale;
 	float luminance_multiplier;
+
+    uint pad2;
 }
 params;
 
@@ -199,14 +204,14 @@ vec4 texture2D_bicubic(sampler2D tex, vec2 uv, int p_lod) {
 #endif // !USE_GLOW_FILTER_BICUBIC
 
 // Based on Reinhard's extended formula, see equation 4 in https://doi.org/cjbgrt
-vec3 tonemap_reinhard(vec3 color, float white) {
-	float white_squared = white * white;
+vec3 tonemap_reinhard(vec3 color) {
+    float white_squared = params.tonemap_a;
 	vec3 white_squared_color = white_squared * color;
 	// Equivalent to color * (1 + color / white_squared) / (1 + color)
 	return (white_squared_color + color * color) / (white_squared_color + white_squared);
 }
 
-vec3 tonemap_filmic(vec3 color, float white) {
+vec3 tonemap_filmic(vec3 color) {
 	// exposure bias: input scale (color *= bias, white *= bias) to make the brightness consistent with other tonemappers
 	// also useful to scale the input to the range that the tonemapper is designed for (some require very high input values)
 	// has no effect on the curve's general shape or visual properties
@@ -219,14 +224,14 @@ vec3 tonemap_filmic(vec3 color, float white) {
 	const float F = 0.30f;
 
 	vec3 color_tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
-	float white_tonemapped = ((white * (A * white + C * B) + D * E) / (white * (A * white + B) + D * F)) - E / F;
 
-	return color_tonemapped / white_tonemapped;
+    return color_tonemapped / params.tonemap_a;
 }
 
 // Adapted from https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
 // (MIT License).
-vec3 tonemap_aces(vec3 color, float white) {
+vec3 tonemap_aces(vec3 color) {
+// These constants must match the those in the C++ code that calculates the parameters.
 	const float exposure_bias = 1.8f;
 	const float A = 0.0245786f;
 	const float B = 0.000090537f;
@@ -249,45 +254,42 @@ vec3 tonemap_aces(vec3 color, float white) {
 	vec3 color_tonemapped = (color * (color + A) - B) / (color * (C * color + D) + E);
 	color_tonemapped *= odt_to_rgb;
 
-	white *= exposure_bias;
-	float white_tonemapped = (white * (white + A) - B) / (white * (C * white + D) + E);
-
-	return color_tonemapped / white_tonemapped;
+    return color_tonemapped / params.tonemap_a;
 }
 
-// Polynomial approximation of EaryChow's AgX sigmoid curve.
-// x must be within the range [0.0, 1.0]
-vec3 agx_contrast_approx(vec3 x) {
-	// Generated with Excel trendline
-	// Input data: Generated using python sigmoid with EaryChow's configuration and 57 steps
-	// Additional padding values were added to give correct intersections at 0.0 and 1.0
-	// 6th order, intercept of 0.0 to remove an operation and ensure intersection at 0.0
-	vec3 x2 = x * x;
-	vec3 x4 = x2 * x2;
-	return 0.021 * x + 4.0111 * x2 - 25.682 * x2 * x + 70.359 * x4 - 74.778 * x4 * x + 27.069 * x4 * x2;
+vec3 allenwp_curve(vec3 x) {
+    const float output_max_value = 1.0; // SDR always has a output_max_value of 1.0
+
+    // These constants must match the those in the C++ code that calculates the parameters.
+    // 18% "middle gray" is perceptually 50% of the brightness of reference white.
+    const float awp_crossover_point = 0.18;
+    // When output_max_value and/or awp_crossover_point are no longer constant,
+    // awp_shoulder_max can be calculated on the CPU and passed in as params.tonemap_e
+    const float awp_shoulder_max = output_max_value - awp_crossover_point;
+
+    float awp_contrast = params.tonemap_a;
+    float awp_toe_a = params.tonemap_b;
+    float awp_slope = params.tonemap_c;
+    float awp_w = params.tonemap_d;
+
+    // Reinhard-like shoulder:
+    vec3 s = x - awp_crossover_point;
+    vec3 slope_s = awp_slope * s;
+    s = slope_s * (1.0 + s / awp_w) / (1.0 + (slope_s / awp_shoulder_max));
+    s += awp_crossover_point;
+
+    // Sigmoid power function toe:
+    vec3 t = pow(x, vec3(awp_contrast));
+    t = t / (t + awp_toe_a);
+
+    return mix(s, t, lessThan(x, vec3(awp_crossover_point)));
 }
 
 // This is an approximation and simplification of EaryChow's AgX implementation that is used by Blender.
 // This code is based off of the script that generates the AgX_Base_sRGB.cube LUT that Blender uses.
 // Source: https://github.com/EaryChow/AgX_LUT_Gen/blob/main/AgXBasesRGB.py
 vec3 tonemap_agx(vec3 color) {
-	// Combined linear sRGB to linear Rec 2020 and Blender AgX inset matrices:
-	const mat3 srgb_to_rec2020_agx_inset_matrix = mat3(
-			0.54490813676363087053, 0.14044005884001287035, 0.088827411851915368603,
-			0.37377945959812267119, 0.75410959864013760045, 0.17887712465043811023,
-			0.081384976686407536266, 0.10543358536857773485, 0.73224999956948382528);
 
-	// Combined inverse AgX outset matrix and linear Rec 2020 to linear sRGB matrices.
-	const mat3 agx_outset_rec2020_to_srgb_matrix = mat3(
-			1.9645509602733325934, -0.29932243390911083839, -0.16436833806080403409,
-			-0.85585845117807513559, 1.3264510741502356555, -0.23822464068860595117,
-			-0.10886710826831608324, -0.027084020983874825605, 1.402665347143271889);
-
-	// LOG2_MIN      = -10.0
-	// LOG2_MAX      =  +6.5
-	// MIDDLE_GRAY   =  0.18
-	const float min_ev = -12.4739311883324; // log2(pow(2, LOG2_MIN) * MIDDLE_GRAY)
-	const float max_ev = 4.02606881166759; // log2(pow(2, LOG2_MAX) * MIDDLE_GRAY)
 
 	// Large negative values in one channel and large positive values in other
 	// channels can result in a colour that appears darker and more saturated than
@@ -302,22 +304,32 @@ vec3 tonemap_agx(vec3 color) {
 	// A value of 2e-10 intentionally introduces insignificant error to prevent
 	// log2(0.0) after the inset matrix is applied; color will be >= 1e-10 after
 	// the matrix transform.
-	color = max(color, 2e-10);
-
-	// Do AGX in rec2020 to match Blender and then apply inset matrix.
-	color = srgb_to_rec2020_agx_inset_matrix * color;
+    const mat3 srgb_to_rec2020_agx_inset_matrix = mat3(
+        0.544814746488245, 0.140416948464053, 0.0888104196149096,
+    0.373787398372697, 0.754137554567394, 0.178871756420858,
+    0.0813978551390581, 0.105445496968552, 0.732317823964232);
 
 	// Log2 space encoding.
 	// Must be clamped because agx_contrast_approx may not work
 	// well with values outside of the range [0.0, 1.0]
-	color = clamp(log2(color), min_ev, max_ev);
-	color = (color - min_ev) / (max_ev - min_ev);
 
-	// Apply sigmoid function approximation.
-	color = agx_contrast_approx(color);
+const mat3 agx_outset_rec2020_to_srgb_matrix = mat3(
+1.96488741169489, -0.299313364904742, -0.164352742528393,
+-0.855988495690215, 1.32639796461980, -0.238183969428088,
+-0.108898916004672, -0.0270845997150571, 1.40253671195648);
 
-	// Convert back to linear before applying outset matrix.
-	color = pow(color, vec3(2.4));
+const float output_max_value = 1.0; // SDR always has a output_max_value of 1.0
+
+// Apply inset matrix.
+color = srgb_to_rec2020_agx_inset_matrix * color;
+
+// Use the allenwp tonemapping curve to match the Blender AgX curve while
+// providing stability across all variable dyanimc range (SDR, HDR, EDR).
+color = allenwp_curve(color);
+
+// Clipping to output_max_value is required to address a cyan colour that occurs
+// with very bright inputs.
+color = min(vec3(output_max_value), color);
 
 	// Apply outset to make the result more chroma-laden and then go back to linear sRGB.
 	color = agx_outset_rec2020_to_srgb_matrix * color;
@@ -342,17 +354,161 @@ vec3 linear_to_srgb(vec3 color) {
 #define TONEMAPPER_ACES 3
 #define TONEMAPPER_AGX 4
 
-vec3 apply_tonemapping(vec3 color, float white) { // inputs are LINEAR
+#define luminosityFactor vec3(0.2126, 0.7152, 0.0722)
+
+ const float uch_maxDisplayBrightness = 1.035;
+ const float uch_contrast = 1.823;
+ const float uch_linearSectionStart = 0.041;
+ const float uch_linearSectionLength = 0.595;
+ const float uch_black = 1.027;
+ const float uch_pedestal = 0.;
+
+ const float agx_mix = 0.850;
+ const float agx_mix_exp = 0.400;
+ const float agx_slope = 1.180;
+ const float agx_power = 6.468;
+ const float agx_sat_dependency = 1;
+ const float agx_sat = 0.916;
+ const float agx_gain = 0.662;
+
+vec3 rgb2hsv(vec3 c)
+{
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 hsv2rgb(vec3 c)
+{
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+// Uchimura 2017, "HDR theory and practice"
+// Math: https://www.desmos.com/calculator/gslcdxvipg
+// Source: https://www.slideshare.net/nikuque/hdr-theory-and-practicce-jp
+vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b) {
+    float l0 = ((P - m) * l) / a;
+    float L0 = m - m / a;
+    float L1 = m + (1.0 - m) / a;
+    float S0 = m + l0;
+    float S1 = m + a * l0;
+    float C2 = (a * P) / (P - S1);
+    float CP = -C2 / P;
+
+vec3 w0 = vec3(1.0 - smoothstep(0.0, m, x));
+vec3 w2 = vec3(step(m + l0, x));
+vec3 w1 = vec3(1.0 - w0 - w2);
+
+vec3 T = vec3(m * pow(x / m, vec3(c)) + b);
+vec3 S = vec3(P - (P - S1) * exp(CP * (x - S0)));
+vec3 L = vec3(m + a * (x - m));
+
+    return T * w0 + L * w1 + S * w2;
+}
+
+vec3 uchimura(vec3 x) {
+    const float P = uch_maxDisplayBrightness;
+    const float a = uch_contrast;
+    const float m = uch_linearSectionStart;
+    const float l = uch_linearSectionLength;
+    const float c = uch_black;
+    const float b = uch_pedestal;
+
+    return uchimura(x, P, a, m, l, c, b);
+}
+
+vec3 agxDefaultContrastApprox(vec3 x) {
+    vec3 x2 = x * x;
+    vec3 x4 = x2 * x2;
+
+    return +15.5 * x4 * x2
+    - 40.14 * x4 * x
+    + 31.96 * x4
+    - 6.868 * x2 * x
+    + 0.4298 * x2
+    + 0.1191 * x
+    - 0.00232;
+}
+
+vec3 agxEotf(vec3 val) {
+    mat3 agx_mat_inv = mat3(
+    1.19687900512017, -0.0528968517574562, -0.0529716355144438,
+    -0.0980208811401368, 1.15190312990417, -0.0980434501171241,
+    -0.0990297440797205, -0.0989611768448433, 1.15107367264116);
+
+    return agx_mat_inv * val;
+}
+
+vec3 agx(vec3 val) {
+
+    mat3 agx_mat = mat3(
+    0.842479062253094, 0.0423282422610123, 0.0423756549057051,
+    0.0784335999999992, 0.878468636469772, 0.0784336,
+    0.0792237451477643, 0.0791661274605434, 0.879142973793104);
+
+    float min_ev = -12.47393f;
+    float max_ev = 4.026069f;
+
+    val = agx_mat * val;
+
+    val = clamp(log2(val), min_ev, max_ev);
+    val = (val - min_ev) / (max_ev - min_ev);
+
+    val = agxDefaultContrastApprox(val);
+
+    return val;
+}
+
+vec3 agxLook(vec3 val, float luma, vec4 vals, float agxsat) {
+
+    vec3 offset = vec3(0.0, 0.0, 0.0);
+    vec3 slope = vec3(vals.z, vals.z, vals.z);
+    vec3 power = vec3(vals.w, vals.w, vals.w);
+    float sat = agxsat;
+
+    val = pow(max(vec3(0.), val * slope + offset), power);
+    return luma + sat * (val - luma);
+}
+
+vec3 RGB_Uchimura_AgX(vec3 x) {
+
+    x = pow(max(vec3(0.), x * 1.075), vec3(1.025));
+
+    vec3 hsv = rgb2hsv(x);
+
+    float luma = clamp(dot(x, luminosityFactor), 0.0, 1.0);
+
+    vec3 col = agx(x);
+    col = agxLook(col, luma, vec4(agx_mix, agx_mix_exp, agx_slope, agx_power), agx_sat);
+    col = agxEotf(col);
+
+    x = mix(x, col, agx_mix * pow(luma, agx_mix_exp) * sqrt(1.0 - agx_sat_dependency * clamp(hsv.y, 0.0, 1.0)));
+
+    x *= agx_gain;
+    x = uchimura(x);
+
+    return x;
+}
+
+vec3 apply_tonemapping(vec3 color) { // inputs are LINEAR
 	// Ensure color values passed to tonemappers are positive.
 	// They can be negative in the case of negative lights, which leads to undesired behavior.
+    color = max(vec3(0.0), color);
+
 	if (params.tonemapper == TONEMAPPER_LINEAR) {
-		return color;
-	} else if (params.tonemapper == TONEMAPPER_REINHARD) {
-		return tonemap_reinhard(max(vec3(0.0f), color), white);
+		return RGB_Uchimura_AgX(color);
+    } else if (params.tonemapper == TONEMAPPER_REINHARD) {
+        return tonemap_reinhard(color);
 	} else if (params.tonemapper == TONEMAPPER_FILMIC) {
-		return tonemap_filmic(max(vec3(0.0f), color), white);
+        return tonemap_filmic(color);
 	} else if (params.tonemapper == TONEMAPPER_ACES) {
-		return tonemap_aces(max(vec3(0.0f), color), white);
+        return tonemap_aces(color);
 	} else { // TONEMAPPER_AGX
 		return tonemap_agx(color);
 	}
@@ -875,7 +1031,7 @@ void main() {
 	}
 #endif
 
-	color.rgb = apply_tonemapping(color.rgb, params.white);
+	color.rgb = apply_tonemapping(color.rgb);
 
 	bool convert_to_srgb = bool(params.flags & FLAG_CONVERT_TO_SRGB);
 	if (convert_to_srgb) {
@@ -890,7 +1046,7 @@ void main() {
 		}
 
 		// high dynamic range -> SRGB
-		glow = apply_tonemapping(glow, params.white);
+		glow = apply_tonemapping(glow);
 		if (convert_to_srgb) {
 			glow = linear_to_srgb(glow);
 		}
