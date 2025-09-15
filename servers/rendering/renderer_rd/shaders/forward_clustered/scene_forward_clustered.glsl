@@ -2358,7 +2358,7 @@ void fragment_shader(in SceneData scene_data) {
                         float n1 = noise(wpos.xz * 0.02);
                         float n2 = noise(wpos.xz * 0.01 + n1 * .7);
 
-                        shadow *= clamp(smoothstep(-.25, .1, n2), 0.4, 1.);
+                         shadow *= clamp(smoothstep(-.25, .1, n2), 0.4, 1.);
 					}
 
 #ifdef USE_LIGHTMAP
