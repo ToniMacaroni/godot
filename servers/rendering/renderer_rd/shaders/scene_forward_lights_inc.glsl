@@ -199,7 +199,7 @@ void light_compute(half vertz, hvec3 N, hvec3 L, hvec3 V, half A, hvec3 light_co
 #else
 			// lambert
 			diffuse_brdf_NL = cNdotL * half(1.0 / M_PI);
-#endif 
+#endif
 			diffuse_light += light_color * diffuse_brdf_NL * attenuation;
 
 #if defined(BURLEY_CODE_USED)
