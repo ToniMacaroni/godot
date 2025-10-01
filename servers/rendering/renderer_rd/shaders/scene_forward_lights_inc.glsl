@@ -199,8 +199,16 @@ void light_compute(half vertz, hvec3 N, hvec3 L, hvec3 V, half A, hvec3 light_co
 #else
 			// lambert
 			diffuse_brdf_NL = cNdotL * half(1.0 / M_PI);
-#endif
+#endif 
 			diffuse_light += light_color * diffuse_brdf_NL * attenuation;
+
+#if defined(BURLEY_CODE_USED)
+vec3 blight_highp = vec3(L);
+vec3 bview_highp = vec3(V);
+
+#CODE : BURLEY
+
+#endif
 
 #if defined(LIGHT_BACKLIGHT_USED)
 			diffuse_light += light_color * (hvec3(1.0 / M_PI) - diffuse_brdf_NL) * backlight * attenuation;

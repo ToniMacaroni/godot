@@ -94,6 +94,7 @@ void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 	actions.entry_point_stages["vertex"] = ShaderCompiler::STAGE_VERTEX;
 	actions.entry_point_stages["fragment"] = ShaderCompiler::STAGE_FRAGMENT;
 	actions.entry_point_stages["light"] = ShaderCompiler::STAGE_FRAGMENT;
+	actions.entry_point_stages["burley"] = ShaderCompiler::STAGE_FRAGMENT;
 
 	actions.render_mode_values["blend_add"] = Pair<int *, int>(&blend_mode, BLEND_MODE_ADD);
 	actions.render_mode_values["blend_mix"] = Pair<int *, int>(&blend_mode, BLEND_MODE_MIX);
@@ -835,6 +836,15 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.render_mode_defines["cull_disabled"] = "#define DO_SIDE_CHECK\n";
 		actions.render_mode_defines["particle_trails"] = "#define USE_PARTICLE_TRAILS\n";
 		actions.render_mode_defines["depth_prepass_alpha"] = "#define USE_OPAQUE_PREPASS\n";
+
+		// for burley
+		actions.renames["LIGHT_COLOR"] = "light_color";
+		actions.renames["BRDF_NL"] = "diffuse_brdf_NL";
+		actions.renames["ATTENUATION"] = "attenuation";
+		actions.renames["BACKLIGHT"] = "backlight";
+		actions.renames["DIFFUSE_LIGHT"] = "diffuse_light";
+		actions.renames["BVIEW"] = "bview_highp";
+		actions.renames["LIGHT_DIR"] = "blight_highp";
 
 		bool force_lambert = GLOBAL_GET("rendering/shading/overrides/force_lambert_over_burley");
 
