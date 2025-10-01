@@ -385,6 +385,8 @@ private:
 		uint64_t grow : 1;
 		uint64_t proximity_fade : 1;
 		uint64_t orm : 1;
+		uint64_t campos_fade : 1;
+		uint64_t depth_blend : 1;
 
 		// flag bitfield
 		uint32_t feature_mask;
@@ -436,6 +438,8 @@ private:
 		mk.grow = grow_enabled;
 		mk.proximity_fade = proximity_fade_enabled;
 		mk.distance_fade = distance_fade;
+		mk.campos_fade = campos_fade;
+		mk.depth_blend = depth_blend;
 		mk.emission_op = emission_op;
 		mk.alpha_antialiasing_mode = alpha_antialiasing_mode;
 		mk.orm = orm;
@@ -499,6 +503,8 @@ private:
 		StringName msdf_outline_size;
 		StringName distance_fade_min;
 		StringName distance_fade_max;
+		StringName campos_fade_max;
+		StringName depth_blend_amount;
 		StringName ao_light_affect;
 
 		StringName metallic_texture_channel;
@@ -596,6 +602,12 @@ private:
 	DistanceFadeMode distance_fade = DISTANCE_FADE_DISABLED;
 	float distance_fade_max_distance = 0.0f;
 	float distance_fade_min_distance = 0.0f;
+
+	bool campos_fade = false;
+	float campos_fade_max = 20.0f;
+
+	bool depth_blend = false;
+	float depth_blend_amount = 0.2f;
 
 	BlendMode blend_mode = BLEND_MODE_MIX;
 	BlendMode detail_blend_mode = BLEND_MODE_MIX;
@@ -836,6 +848,18 @@ public:
 
 	void set_distance_fade_min_distance(float p_distance);
 	float get_distance_fade_min_distance() const;
+
+	void set_campos_fade_enabled(bool p_enable);
+	bool is_campos_fade_enabled() const;
+
+	void set_campos_fade_max(float p_max);
+	float get_campos_fade_max() const;
+
+	void set_depth_blend_enabled(bool p_enable);
+	bool is_depth_blend_enabled() const;
+
+	void set_depth_blend_amount(float p_amount);
+	float get_depth_blend_amount() const;
 
 	void set_emission_operator(EmissionOperator p_op);
 	EmissionOperator get_emission_operator() const;

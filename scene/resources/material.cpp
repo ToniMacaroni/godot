@@ -628,6 +628,10 @@ void BaseMaterial3D::init_shaders() {
 	shader_names->distance_fade_min = "distance_fade_min";
 	shader_names->distance_fade_max = "distance_fade_max";
 
+	shader_names->campos_fade_max = "campos_fade_max";
+
+	shader_names->depth_blend_amount = "depth_blend_amount";
+
 	shader_names->msdf_pixel_range = "msdf_pixel_range";
 	shader_names->msdf_outline_size = "msdf_outline_size";
 
@@ -983,6 +987,13 @@ uniform float distance_fade_min : hint_range(0.0, 4096.0, 0.01);
 uniform float distance_fade_max : hint_range(0.0, 4096.0, 0.01);
 )";
 	}
+	if (campos_fade) {
+		code += R"(
+		uniform float campos_fade_max = 20.;
+		global uniform vec3 cam_pos;
+		global uniform float render_dist_factor;
+)";
+	}
 
 	if (flags[FLAG_ALBEDO_TEXTURE_MSDF] && flags[FLAG_UV1_USE_TRIPLANAR]) {
 		String msg = "MSDF is not supported on triplanar materials. Ignoring MSDF in favor of triplanar mapping.";
@@ -1209,6 +1220,13 @@ uniform vec3 uv2_offset;
 
 	if (flags[FLAG_USE_FOV_OVERRIDE]) {
 		code += "uniform float fov_override : hint_range(1.0, 179.0, 0.1);\n";
+	}
+
+	if (depth_blend) {
+		code += R"(
+		uniform float depth_blend_amount : hint_range(0.0, 1.0, 0.01) = 0.2;
+		global uniform sampler2D high_freq_noise;
+)";
 	}
 
 	// Generate vertex shader.
@@ -1472,6 +1490,12 @@ void vertex() {)";
 )";
 	}
 
+	if (campos_fade) {
+		code += R"(
+		COLOR.x = distance(MODEL_MATRIX[3].xyz, cam_pos);
+)";
+	}
+
 	// End of the vertex shader function.
 	code += "}\n";
 
@@ -1498,6 +1522,21 @@ vec4 triplanar_texture(sampler2D p_sampler, vec3 p_weights, vec3 p_triplanar_pos
 	// Generate fragment shader.
 	code += R"(
 void fragment() {)";
+
+	if (campos_fade) {
+		code += R"(
+		float fade_distance = COLOR.x;
+ 	if (fade_distance > render_dist_factor * (campos_fade_max-4.)){
+
+		const vec3 magic = vec3(0.06711056f, 0.00583715f, 52.9829189f);
+		float fade = clamp(smoothstep(render_dist_factor * campos_fade_max,render_dist_factor * campos_fade_max - 4., fade_distance), 0.0, 1.0);
+		//float fade = clamp(smoothstep(render_dist_factor * 32.,render_dist_factor * 28., fade_distance), 0.0, 1.0);
+		if (fade < 0.001 || fade < fract(magic.z * fract(dot(FRAGCOORD.xy, magic.xy)))) {
+			discard;
+		}
+	}
+)";
+	}
 
 	if (!flags[FLAG_UV1_USE_TRIPLANAR]) {
 		code += R"(
@@ -2054,6 +2093,17 @@ void fragment() {)";
 )";
 	}
 
+	if (depth_blend) {
+		code += R"(
+		vec2 clip = (INV_PROJECTION_MATRIX * vec4(1.,1., FRAGCOORD.z, 1.)).zw;
+	clip.x /= clip.y;
+	clip.x -= texture(high_freq_noise, UV * 30.).r * depth_blend_amount - (depth_blend_amount * .4);
+	clip = (PROJECTION_MATRIX * vec4(1., 1., clip.x, 1.)).zw;
+	clip.x /= clip.y;
+	DEPTH = clip.x;
+)";
+	}
+
 	code += "}\n";
 
 	// We must create the shader outside the shader_map_mutex to avoid potential deadlocks with
@@ -2601,6 +2651,10 @@ void BaseMaterial3D::_validate_property(PropertyInfo &p_property) const {
 			p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 		}
 
+		if (p_property.name == "campos_fade_max" && !campos_fade) {
+			p_property.usage = PROPERTY_USAGE_NO_EDITOR;
+		}
+
 		if ((p_property.name == "uv1_triplanar_sharpness" || p_property.name == "uv1_world_triplanar") && !flags[FLAG_UV1_USE_TRIPLANAR]) {
 			p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 		}
@@ -3126,6 +3180,44 @@ float BaseMaterial3D::get_distance_fade_min_distance() const {
 	return distance_fade_min_distance;
 }
 
+void BaseMaterial3D::set_campos_fade_enabled(bool p_enable) {
+	campos_fade = p_enable;
+	_queue_shader_change();
+	notify_property_list_changed();
+}
+
+bool BaseMaterial3D::is_campos_fade_enabled() const {
+	return campos_fade;
+}
+
+void BaseMaterial3D::set_campos_fade_max(float p_max) {
+	campos_fade_max = p_max;
+	_material_set_param(shader_names->campos_fade_max, p_max);
+}
+
+float BaseMaterial3D::get_campos_fade_max() const {
+	return campos_fade_max;
+}
+
+void BaseMaterial3D::set_depth_blend_enabled(bool p_enable) {
+	depth_blend = p_enable;
+	_queue_shader_change();
+	notify_property_list_changed();
+}
+
+bool BaseMaterial3D::is_depth_blend_enabled() const {
+	return depth_blend;
+}
+
+void BaseMaterial3D::set_depth_blend_amount(float p_amount) {
+	depth_blend_amount = p_amount;
+	_material_set_param(shader_names->depth_blend_amount, p_amount);
+}
+
+float BaseMaterial3D::get_depth_blend_amount() const {
+	return depth_blend_amount;
+}
+
 void BaseMaterial3D::set_emission_operator(EmissionOperator p_op) {
 	if (emission_op == p_op) {
 		return;
@@ -3548,6 +3640,18 @@ void BaseMaterial3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_distance_fade_min_distance", "distance"), &BaseMaterial3D::set_distance_fade_min_distance);
 	ClassDB::bind_method(D_METHOD("get_distance_fade_min_distance"), &BaseMaterial3D::get_distance_fade_min_distance);
 
+	ClassDB::bind_method(D_METHOD("set_campos_fade_enabled", "enabled"), &BaseMaterial3D::set_campos_fade_enabled);
+	ClassDB::bind_method(D_METHOD("is_campos_fade_enabled"), &BaseMaterial3D::is_campos_fade_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_campos_fade_max", "max"), &BaseMaterial3D::set_campos_fade_max);
+	ClassDB::bind_method(D_METHOD("get_campos_fade_max"), &BaseMaterial3D::get_campos_fade_max);
+
+	ClassDB::bind_method(D_METHOD("set_depth_blend_enabled", "enabled"), &BaseMaterial3D::set_depth_blend_enabled);
+	ClassDB::bind_method(D_METHOD("is_depth_blend_enabled"), &BaseMaterial3D::is_depth_blend_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_depth_blend_amount", "amount"), &BaseMaterial3D::set_depth_blend_amount);
+	ClassDB::bind_method(D_METHOD("get_depth_blend_amount"), &BaseMaterial3D::get_depth_blend_amount);
+
 	ClassDB::bind_method(D_METHOD("set_z_clip_scale", "scale"), &BaseMaterial3D::set_z_clip_scale);
 	ClassDB::bind_method(D_METHOD("get_z_clip_scale"), &BaseMaterial3D::get_z_clip_scale);
 
@@ -3758,6 +3862,14 @@ void BaseMaterial3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "distance_fade_mode", PROPERTY_HINT_ENUM, "Disabled,PixelAlpha,PixelDither,ObjectDither"), "set_distance_fade", "get_distance_fade");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "distance_fade_min_distance", PROPERTY_HINT_RANGE, "0,4096,0.01,suffix:m"), "set_distance_fade_min_distance", "get_distance_fade_min_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "distance_fade_max_distance", PROPERTY_HINT_RANGE, "0,4096,0.01,suffix:m"), "set_distance_fade_max_distance", "get_distance_fade_max_distance");
+
+	ADD_GROUP("CamPos Fade", "campos_fade");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "campos_fade"), "set_campos_fade_enabled", "is_campos_fade_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "campos_fade_max"), "set_campos_fade_max", "get_campos_fade_max");
+
+	ADD_GROUP("Depth Blend", "depth_blend");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "depth_blend"), "set_depth_blend_enabled", "is_depth_blend_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "depth_blend_amount"), "set_depth_blend_amount", "get_depth_blend_amount");
 
 	ADD_GROUP("Stencil", "stencil_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "stencil_mode", PROPERTY_HINT_ENUM, "Disabled,Outline,X-Ray,Custom"), "set_stencil_mode", "get_stencil_mode");
