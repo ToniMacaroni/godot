@@ -93,7 +93,7 @@ void RenderSceneBuffersRD::update_sizes(NamedTexture &p_named_texture) {
 
 void RenderSceneBuffersRD::free_named_texture(NamedTexture &p_named_texture) {
 	if (p_named_texture.texture.is_valid()) {
-		RD::get_singleton()->free(p_named_texture.texture);
+		RD::get_singleton()->free_rid(p_named_texture.texture);
 	}
 	p_named_texture.texture = RID();
 	p_named_texture.slices.clear(); // slices should be freed automatically as dependents...
@@ -135,9 +135,14 @@ void RenderSceneBuffersRD::cleanup() {
 	// Clear weight_buffer / blur textures.
 	for (WeightBuffers &weight_buffer : weight_buffers) {
 		if (weight_buffer.weight.is_valid()) {
-			RD::get_singleton()->free(weight_buffer.weight);
+			RD::get_singleton()->free_rid(weight_buffer.weight);
 			weight_buffer.weight = RID();
 		}
+	}
+
+	if (fsr1_context) {
+		memdelete(fsr1_context);
+		fsr1_context = nullptr;
 	}
 
 #ifdef METAL_ENABLED
@@ -248,6 +253,22 @@ void RenderSceneBuffersRD::set_anisotropic_filtering_level(RS::ViewportAnisotrop
 
 void RenderSceneBuffersRD::set_use_debanding(bool p_use_debanding) {
 	use_debanding = p_use_debanding;
+}
+
+void RenderSceneBuffersRD::ensure_fsr1(RendererRD::FSR1Effect *p_effect) {
+	if (fsr1_context) {
+		return;
+	}
+
+	RendererRD::TextureStorage *texture_storage = RendererRD::TextureStorage::get_singleton();
+	RenderingDevice *rd = RD::get_singleton();
+
+	// Determine the output format of the render target.
+	RID dest = texture_storage->render_target_get_rd_texture(render_target);
+	RD::TextureFormat tf = rd->texture_get_format(dest);
+	RD::DataFormat output_format = tf.format;
+
+	fsr1_context = p_effect->create_context(internal_size, target_size, output_format);
 }
 
 #ifdef METAL_ENABLED

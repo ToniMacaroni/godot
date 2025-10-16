@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "servers/rendering/renderer_rd/pipeline_deferred_rd.h"
 #include "servers/rendering/renderer_rd/shaders/effects/screen_space_reflection.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/screen_space_reflection_filter.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/screen_space_reflection_scale.glsl.gen.h"
@@ -46,7 +47,7 @@
 #include "servers/rendering/renderer_rd/shaders/effects/sharpen.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/chromatic_abberation.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/effects/screen_space_shadows.glsl.gen.h"
-#include "servers/rendering_server.h"
+#include "servers/rendering/rendering_server.h"
 
 #define RB_SCOPE_SSDS SNAME("rb_ssds")
 #define RB_SCOPE_SSIL SNAME("rb_ssil")
@@ -218,7 +219,7 @@ private:
 
 		RID mirror_sampler;
 
-		RID pipelines[SS_EFFECTS_MAX];
+		PipelineDeferredRD pipelines[SS_EFFECTS_MAX];
 	} ss_effects;
 
 	/* SSIL */
@@ -315,7 +316,7 @@ private:
 		SsilInterleaveShaderRD interleave_shader;
 		RID interleave_shader_version;
 
-		RID pipelines[SSIL_MAX];
+		PipelineDeferredRD pipelines[SSIL_MAX];
 	} ssil;
 
 	void gather_ssil(RD::ComputeListID p_compute_list, const RID *p_ssil_slices, const RID *p_edges_slices, const SSILSettings &p_settings, bool p_adaptive_base_pass, RID p_gather_uniform_set, RID p_importance_map_uniform_set, RID p_projection_uniform_set);
@@ -411,7 +412,7 @@ private:
 		SsaoInterleaveShaderRD interleave_shader;
 		RID interleave_shader_version;
 
-		RID pipelines[SSAO_MAX];
+		PipelineDeferredRD pipelines[SSAO_MAX];
 	} ssao;
 
 	void gather_ssao(RD::ComputeListID p_compute_list, const RID *p_ao_slices, const SSAOSettings &p_settings, bool p_adaptive_base_pass, RID p_gather_uniform_set, RID p_importance_map_uniform_set);
@@ -445,7 +446,7 @@ private:
 	struct ScreenSpaceReflectionScale {
 		ScreenSpaceReflectionScaleShaderRD shader;
 		RID shader_version;
-		RID pipelines[SSR_VARIATIONS];
+		PipelineDeferredRD pipelines[SSR_VARIATIONS];
 	} ssr_scale;
 
 	// SSR main
@@ -479,7 +480,7 @@ private:
 	struct ScreenSpaceReflection {
 		ScreenSpaceReflectionShaderRD shader;
 		RID shader_version;
-		RID pipelines[SSR_VARIATIONS][SCREEN_SPACE_REFLECTION_MAX];
+		PipelineDeferredRD pipelines[SSR_VARIATIONS][SCREEN_SPACE_REFLECTION_MAX];
 
 		RID ubo;
 	} ssr;
@@ -508,10 +509,17 @@ private:
 	struct ScreenSpaceReflectionFilter {
 		ScreenSpaceReflectionFilterShaderRD shader;
 		RID shader_version;
-		RID pipelines[SSR_VARIATIONS][SCREEN_SPACE_REFLECTION_FILTER_MAX];
+		PipelineDeferredRD pipelines[SSR_VARIATIONS][SCREEN_SPACE_REFLECTION_FILTER_MAX];
 	} ssr_filter;
 
 	/* Subsurface scattering */
+
+	enum SSSMode {
+		SUBSURFACE_SCATTERING_MODE_LOW_QUALITY,
+		SUBSURFACE_SCATTERING_MODE_MEDIUM_QUALITY,
+		SUBSURFACE_SCATTERING_MODE_HIGH_QUALITY,
+		SUBSURFACE_SCATTERING_MODE_MAX
+	};
 
 	struct SubSurfaceScatteringPushConstant {
 		int32_t screen_size[2];
@@ -531,7 +539,7 @@ private:
 		SubSurfaceScatteringPushConstant push_constant;
 		SubsurfaceScatteringShaderRD shader;
 		RID shader_version;
-		RID pipelines[3]; //3 quality levels
+		PipelineDeferredRD pipelines[SUBSURFACE_SCATTERING_MODE_MAX];
 	} sss;
 
 	struct SharpenPushConstant {

@@ -34,11 +34,12 @@
 #include "servers/rendering/renderer_rd/effects/bokeh_dof.h"
 #include "servers/rendering/renderer_rd/effects/copy_effects.h"
 #include "servers/rendering/renderer_rd/effects/debug_effects.h"
-#include "servers/rendering/renderer_rd/effects/fsr.h"
+#include "servers/rendering/renderer_rd/effects/ffx/fsr1.h"
 #include "servers/rendering/renderer_rd/effects/luminance.h"
 #ifdef METAL_ENABLED
 #include "servers/rendering/renderer_rd/effects/metal_fx.h"
 #endif
+#include "servers/rendering/renderer_rd/effects/resolve.h"
 #include "servers/rendering/renderer_rd/effects/smaa.h"
 #include "servers/rendering/renderer_rd/effects/tone_mapper.h"
 #include "servers/rendering/renderer_rd/effects/vrs.h"
@@ -64,8 +65,9 @@ protected:
 	RendererRD::Luminance *luminance = nullptr;
 	RendererRD::SMAA *smaa = nullptr;
 	RendererRD::ToneMapper *tone_mapper = nullptr;
-	RendererRD::FSR *fsr = nullptr;
 	RendererRD::VRS *vrs = nullptr;
+	RendererRD::Resolve *resolve_effects = nullptr;
+	RendererRD::FSR1Effect *fsr1 = nullptr;
 #ifdef METAL_ENABLED
 	RendererRD::MFXSpatialEffect *mfx_spatial = nullptr;
 #endif
@@ -108,8 +110,8 @@ protected:
 	void _render_buffers_ensure_screen_texture(const RenderDataRD *p_render_data);
 	void _render_buffers_copy_screen_texture(const RenderDataRD *p_render_data);
 	void _render_buffers_ensure_depth_texture(const RenderDataRD *p_render_data);
-	void _render_buffers_copy_depth_texture(const RenderDataRD *p_render_data);
-	void _render_buffers_post_process_and_tonemap(const RenderDataRD *p_render_data);
+	void _render_buffers_copy_depth_texture(const RenderDataRD *p_render_data, bool p_use_msaa = false);
+	void _render_buffers_post_process_and_tonemap(const RenderDataRD *p_render_data, bool p_use_msaa = false);
 	void _post_process_subpass(RID p_source_texture, RID p_framebuffer, const RenderDataRD *p_render_data);
 	void _disable_clear_request(const RenderDataRD *p_render_data);
 
@@ -152,6 +154,7 @@ private:
 	int soft_shadow_samples = 0;
 	RS::DecalFilter decals_filter = RS::DECAL_FILTER_LINEAR_MIPMAPS;
 	RS::LightProjectorFilter light_projectors_filter = RS::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS;
+	bool material_use_debanding = false;
 
 	/* RENDER BUFFERS */
 
@@ -276,6 +279,7 @@ public:
 	virtual void decals_set_filter(RS::DecalFilter p_filter) override;
 	virtual void light_projectors_set_filter(RS::LightProjectorFilter p_filter) override;
 	virtual void lightmaps_set_bicubic_filter(bool p_enable) override;
+	virtual void material_set_use_debanding(bool p_enable) override;
 
 	_FORCE_INLINE_ RS::ShadowQuality shadows_quality_get() const {
 		return shadows_quality;
@@ -324,6 +328,10 @@ public:
 	}
 	_FORCE_INLINE_ RS::DecalFilter decals_get_filter() const {
 		return decals_filter;
+	}
+
+	_FORCE_INLINE_ bool material_use_debanding_get() const {
+		return material_use_debanding;
 	}
 
 	int get_roughness_layers() const;
