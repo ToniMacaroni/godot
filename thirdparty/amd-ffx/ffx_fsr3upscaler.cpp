@@ -1030,6 +1030,10 @@ static FfxErrorCode fsr3upscalerDispatch(FfxFsr3UpscalerContext_Private* context
         context->constants.frameIndex += 1.0f;
     }
 
+	// GODOT BEGINS
+	memcpy(context->constants.reprojectionMatrix, params->reprojectionMatrix, sizeof(context->constants.reprojectionMatrix));
+	// GODOT ENDS
+
     // reactive mask bias
     const int32_t threadGroupWorkRegionDim = 8;
     const int32_t dispatchSrcX = (context->constants.renderSize[0] + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
@@ -1356,9 +1360,13 @@ FfxErrorCode ffxFsr3UpscalerContextGenerateReactiveMask(FfxFsr3UpscalerContext* 
     FFX_RETURN_ON_ERROR(
         params,
         FFX_ERROR_INVALID_POINTER);
-    FFX_RETURN_ON_ERROR(
-        params->commandList,
-        FFX_ERROR_INVALID_POINTER);
+	// GODOT BEGINS
+	// Godot doesn't use FFX context to pass command list.
+	// So we don't need to ensure that the command list is not null.
+    // FFX_RETURN_ON_ERROR(
+    //     params->commandList,
+    //     FFX_ERROR_INVALID_POINTER);
+	// GODOT ENDS
 
     FfxFsr3UpscalerContext_Private* contextPrivate = (FfxFsr3UpscalerContext_Private*)(context);
 

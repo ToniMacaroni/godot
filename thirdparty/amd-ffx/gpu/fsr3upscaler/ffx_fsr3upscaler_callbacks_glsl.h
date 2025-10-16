@@ -1,7 +1,7 @@
 // This file is part of the FidelityFX SDK.
 //
 // Copyright (C) 2024 Advanced Micro Devices, Inc.
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
@@ -42,7 +42,7 @@
 
         FfxInt32x2 iMaxRenderSize;
         FfxInt32x2 iMaxUpscaleSize;
-        
+
         FfxFloat32x4  fDeviceToViewDepth;
 
         FfxFloat32x2  fJitter;
@@ -65,6 +65,14 @@
         FfxFloat32    fShadingChangeScale;
         FfxFloat32    fAccumulationAddedPerFrame;
         FfxFloat32    fMinDisocclusionAccumulation;
+
+    	// GODOT BEGINS
+    	// Do not change this to an array, as arrays have different alignment requirements
+    	FfxFloat32    fPad1;
+    	FfxFloat32    fPad2;
+    	FfxFloat32    fPad3;
+    	mat4          mReprojectionMatrix;
+    	// GODOT ENDS
 	} cbFSR3Upscaler;
 
 
@@ -316,7 +324,13 @@ layout (set = 0, binding = FSR3UPSCALER_BIND_SRV_REACTIVE_MASK) uniform texture2
 
 FfxFloat32 LoadReactiveMask(FfxInt32x2 iPxPos)
 {
-	return texelFetch(r_reactive_mask, FfxInt32x2(iPxPos), 0).r * cbFSR3Upscaler.fReactivenessScale;
+    // GODOT BEGINS
+#if FFX_FSR3UPSCALER_OPTION_GODOT_REACTIVE_MASK_CLAMP
+	return min(texelFetch(r_reactive_mask, FfxInt32x2(iPxPos), 0).r * cbFSR3Upscaler.fReactivenessScale, 0.9f);
+#else
+ 	return texelFetch(r_reactive_mask, FfxInt32x2(iPxPos), 0).r * cbFSR3Upscaler.fReactivenessScale;
+#endif
+	// GODOT ENDS
 }
 
 FfxInt32x2 GetReactiveMaskResourceDimensions()
@@ -369,6 +383,18 @@ layout (set = 0, binding = FSR3UPSCALER_BIND_SRV_INPUT_MOTION_VECTORS) uniform t
 FfxFloat32x2 LoadInputMotionVector(FfxInt32x2 iPxDilatedMotionVectorPos)
 {
 	FfxFloat32x2 fSrcMotionVector = texelFetch(r_input_motion_vectors, iPxDilatedMotionVectorPos, 0).xy;
+
+    // GODOT BEGINS
+#if FFX_FSR3UPSCALER_OPTION_GODOT_DERIVE_INVALID_MOTION_VECTORS
+	bool bInvalidMotionVector = all(lessThanEqual(fSrcMotionVector, vec2(-1.0f, -1.0f)));
+	if (bInvalidMotionVector)
+	{
+		FfxFloat32 fSrcDepth = LoadInputDepth(iPxDilatedMotionVectorPos);
+		FfxFloat32x2 fUv = (iPxDilatedMotionVectorPos + FfxFloat32(0.5)) / RenderSize();
+		fSrcMotionVector = FFX_FSR_OPTION_GODOT_DERIVE_INVALID_MOTION_VECTORS_FUNCTION(fUv, fSrcDepth, cbFSR3Upscaler.mReprojectionMatrix);
+	}
+#endif
+	// GODOT ENDS
 
 	FfxFloat32x2 fUvMotionVector = fSrcMotionVector * MotionVectorScale();
 
@@ -727,7 +753,7 @@ layout (set = 0, binding = FSR3UPSCALER_BIND_SRV_LANCZOS_LUT) uniform texture2D 
 FfxFloat32 SampleLanczos2Weight(FfxFloat32 x)
 {
 #if defined(FSR3UPSCALER_BIND_SRV_LANCZOS_LUT)
-	return textureLod(sampler2D(r_lanczos_lut, s_LinearClamp), FfxFloat32x2(x / 2.0, 0.5), 0.0).x; 
+	return textureLod(sampler2D(r_lanczos_lut, s_LinearClamp), FfxFloat32x2(x / 2.0, 0.5), 0.0).x;
 #else
     return 0.f;
 #endif
@@ -783,14 +809,18 @@ FfxFloat32x3 LoadPrevPostAlpha(FFX_PARAMETER_IN FFX_MIN16_I2 iPxPos)
     defined(FSR3UPSCALER_BIND_UAV_AUTOCOMPOSITION)
 
 layout(set = 0, binding = FSR3UPSCALER_BIND_UAV_AUTOREACTIVE, r32f)    uniform image2D  rw_output_autoreactive;
-layout(set = 0, binding = FSR3UPSCALER_BIND_UAV_AUTOCOMPOSITION, r32f) uniform image2D  rw_output_autocomposition;
 
-void StoreAutoReactive(FFX_PARAMETER_IN FFX_MIN16_I2 iPxPos, FFX_PARAMETER_IN FFX_MIN16_F2 fReactive)
-{
-	imageStore(rw_output_autoreactive, iPxPos, FfxFloat32x4(FfxFloat32(fReactive.x), 0.0, 0.0, 0.0));
-
-	imageStore(rw_output_autocomposition, iPxPos, FfxFloat32x4(FfxFloat32(fReactive.y), 0.0, 0.0, 0.0));
-}
+// GODOT BEGINS
+// The binding is never used, so comment it out to avoid compilation errors.
+// layout(set = 0, binding = FSR3UPSCALER_BIND_UAV_AUTOCOMPOSITION, r32f) uniform image2D  rw_output_autocomposition;
+//
+// void StoreAutoReactive(FFX_PARAMETER_IN FFX_MIN16_I2 iPxPos, FFX_PARAMETER_IN FFX_MIN16_F2 fReactive)
+// {
+// 	imageStore(rw_output_autoreactive, iPxPos, FfxFloat32x4(FfxFloat32(fReactive.x), 0.0, 0.0, 0.0));
+//
+// 	imageStore(rw_output_autocomposition, iPxPos, FfxFloat32x4(FfxFloat32(fReactive.y), 0.0, 0.0, 0.0));
+// }
+// GODOT ENDS
 #endif
 
 #if defined(FSR3UPSCALER_BIND_UAV_PREV_PRE_ALPHA_COLOR)

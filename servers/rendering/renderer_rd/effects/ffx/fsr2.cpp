@@ -309,7 +309,7 @@ FSR2Effect::~FSR2Effect() {
 	}
 }
 
-FSR2Context *FSR2Effect::create_context(Size2i p_internal_size, Size2i p_target_size) {
+FSR2Context *FSR2Effect::create_context(Size2i p_internal_size, Size2i p_target_size, bool p_autogen_reactive) {
 	FSR2Context *context = memnew(RendererRD::FSR2Context);
 	context->fsr_desc.flags = FFX_FSR2_ENABLE_HIGH_DYNAMIC_RANGE | FFX_FSR2_ENABLE_DEPTH_INVERTED;
 	context->fsr_desc.maxRenderSize.width = p_internal_size.x;
@@ -328,7 +328,6 @@ FSR2Context *FSR2Effect::create_context(Size2i p_internal_size, Size2i p_target_
 }
 
 void FSR2Effect::upscale(const Parameters &p_params) {
-	// TODO: Transparency & Composition mask is not implemented.
 	FfxFsr2DispatchDescription dispatch_desc = {};
 	RID color = p_params.color;
 	RID depth = p_params.depth;
@@ -340,7 +339,24 @@ void FSR2Effect::upscale(const Parameters &p_params) {
 	dispatch_desc.color = FFXCommon::get_resource_rd(&color, L"color");
 	dispatch_desc.depth = FFXCommon::get_resource_rd(&depth, L"depth");
 	dispatch_desc.motionVectors = FFXCommon::get_resource_rd(&velocity, L"velocity");
-	dispatch_desc.reactive = FFXCommon::get_resource_rd(&reactive, L"reactive");
+
+	// Optional pass of auto-generating reactive masks from opaque-only color.
+	// This may reduce flickering in scenarios where there are massive transparent objects.
+	RID opaque_only = p_params.opaque_only;
+	bool autogen_masks = opaque_only.is_valid();
+
+	dispatch_desc.enableAutoReactive = autogen_masks;
+	if (autogen_masks) {
+		dispatch_desc.autoTcThreshold = .2f;
+		dispatch_desc.autoTcScale = 1.0f;
+		dispatch_desc.autoReactiveScale = 1.0f;
+		dispatch_desc.autoReactiveMax = 0.9f;
+		dispatch_desc.colorOpaqueOnly = FFXCommon::get_resource_rd(&opaque_only, L"opaque_only");
+		dispatch_desc.reactive = {};
+	} else {
+		dispatch_desc.reactive = FFXCommon::get_resource_rd(&reactive, L"reactive");
+	}
+
 	dispatch_desc.exposure = FFXCommon::get_resource_rd(&exposure, L"exposure");
 	dispatch_desc.transparencyAndComposition = {};
 	dispatch_desc.output = FFXCommon::get_resource_rd(&output, L"output");
@@ -359,18 +375,8 @@ void FSR2Effect::upscale(const Parameters &p_params) {
 	dispatch_desc.cameraFar = p_params.z_far;
 	dispatch_desc.cameraFovAngleVertical = p_params.fovy;
 	dispatch_desc.viewSpaceToMetersFactor = 1.0f;
-	// FSR2 does provide automatic reactive mask generation, but that requires an opaque only color target,
-	// which isn't provided in the current Godot pipeline. So now we just disable it.
-	// When Godot adds a deferred renderer, we can re-enable this.
-	dispatch_desc.colorOpaqueOnly = {};
-	dispatch_desc.enableAutoReactive = false;
 
-	dispatch_desc.autoTcThreshold = 1.0f;
-	dispatch_desc.autoTcScale = 1.0f;
-	dispatch_desc.autoReactiveScale = 1.0f;
-	dispatch_desc.autoReactiveMax = 1.0f;
-
-	RendererRD::MaterialStorage::store_camera(p_params.reprojection, dispatch_desc.reprojectionMatrix);
+	MaterialStorage::store_camera(p_params.reprojection, dispatch_desc.reprojectionMatrix);
 
 	FfxErrorCode result = ffxFsr2ContextDispatch(&p_params.context->fsr_context, &dispatch_desc);
 	ERR_FAIL_COND(result != FFX_OK);

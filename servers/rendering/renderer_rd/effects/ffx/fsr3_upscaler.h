@@ -1,5 +1,5 @@
 ﻿/**************************************************************************/
-/*  fsr2.h                                                                */
+/*  fsr3_upscaler.h                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,34 +30,45 @@
 
 #pragma once
 
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_accumulate_pass.glsl.gen.h"
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_autogen_reactive_pass.glsl.gen.h"
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_compute_luminance_pyramid_pass.glsl.gen.h"
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_depth_clip_pass.glsl.gen.h"
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_lock_pass.glsl.gen.h"
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_rcas_pass.glsl.gen.h"
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_reconstruct_previous_depth_pass.glsl.gen.h"
-#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr2/fsr2_tcr_autogen_pass.glsl.gen.h"
-#include "servers/rendering/rendering_server.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_accumulate_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_autogen_reactive_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_debug_view_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_luma_instability_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_luma_pyramid_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_prepare_inputs_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_prepare_reactivity_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_rcas_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_shading_change_pass.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/effects/ffx/fsr3upscaler/fsr3upscaler_shading_change_pyramid_pass.glsl.gen.h"
 
 #include "ffx_common.h"
-#include "thirdparty/amd-ffx/ffx_fsr2.h"
+#include "servers/rendering/rendering_server.h"
+
+#include "thirdparty/amd-ffx/ffx_fsr3upscaler.h"
 
 namespace RendererRD {
-class FSR2Context {
+class FSR3UpscalerContext {
 public:
 	FFXCommon::Scratch scratch;
-	FfxFsr2Context fsr_context;
-	FfxFsr2ContextDescription fsr_desc;
+	FfxFsr3UpscalerContext fsr_context;
+	FfxFsr3UpscalerContextDescription fsr_desc;
 
-	~FSR2Context();
+	// Output resources from FSR3 Upscaler that are required for frame generation
+	FfxResourceInternal reconstructed_prev_nearest_depth;
+	FfxResourceInternal dilated_depth;
+	FfxResourceInternal dilated_motion_vectors;
+	// Only if autogen reactive is used
+	RID generated_reactive_mask = RID();
+
+	~FSR3UpscalerContext();
 };
 
-class FSR2Effect {
+class FSR3UpscalerEffect {
 public:
 	struct Parameters {
-		FSR2Context *context;
+		FSR3UpscalerContext *context;
 		Size2i internal_size;
+		Size2i target_size;
 		RID color;
 		RID depth;
 		RID velocity;
@@ -75,21 +86,23 @@ public:
 		Projection reprojection;
 	};
 
-	FSR2Effect();
-	~FSR2Effect();
-	FSR2Context *create_context(Size2i p_internal_size, Size2i p_target_size, bool p_autogen_reactive);
+	FSR3UpscalerEffect();
+	~FSR3UpscalerEffect();
+	FSR3UpscalerContext *create_context(Size2i p_internal_size, Size2i p_target_size, bool p_autogen_reactive);
 	void upscale(const Parameters &p_params);
 
 private:
 	struct {
-		Fsr2DepthClipPassShaderRD depth_clip;
-		Fsr2ReconstructPreviousDepthPassShaderRD reconstruct_previous_depth;
-		Fsr2LockPassShaderRD lock;
-		Fsr2AccumulatePassShaderRD accumulate;
-		Fsr2RcasPassShaderRD rcas;
-		Fsr2ComputeLuminancePyramidPassShaderRD compute_luminance_pyramid;
-		Fsr2AutogenReactivePassShaderRD autogen_reactive;
-		Fsr2TcrAutogenPassShaderRD tcr_autogen;
+		Fsr3UpscalerPrepareInputsPassShaderRD prepare_inputs;
+		Fsr3UpscalerLumaPyramidPassShaderRD luma_pyramid;
+		Fsr3UpscalerShadingChangePyramidPassShaderRD shading_change_pyramid;
+		Fsr3UpscalerShadingChangePassShaderRD shading_change;
+		Fsr3UpscalerPrepareReactivityPassShaderRD prepare_reactivity;
+		Fsr3UpscalerLumaInstabilityPassShaderRD luma_instability;
+		Fsr3UpscalerAccumulatePassShaderRD accumulate;
+		Fsr3UpscalerRcasPassShaderRD rcas;
+		Fsr3UpscalerDebugViewPassShaderRD debug_view;
+		Fsr3UpscalerAutogenReactivePassShaderRD autogen_reactive;
 	} shaders;
 
 	FFXCommon::Device device;
