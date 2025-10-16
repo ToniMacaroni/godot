@@ -1124,6 +1124,12 @@ void SSEffects::generate_ssao(Ref<RenderSceneBuffersRD> p_render_buffers, SSAORe
 		ssao.gather_push_constant.screen_size[0] = p_settings.full_screen_size.x;
 		ssao.gather_push_constant.screen_size[1] = p_settings.full_screen_size.y;
 
+		float far_radius = GLOBAL_GET("rendering/environment/ssao/far_radius");
+		if (far_radius < 0.5f)
+			ssao.gather_push_constant.far_radius = 0.0f;
+		else
+			ssao.gather_push_constant.far_radius = 1.0f / far_radius;
+
 		ssao.gather_push_constant.half_screen_pixel_size[0] = 2.0 / p_settings.full_screen_size.x;
 		ssao.gather_push_constant.half_screen_pixel_size[1] = 2.0 / p_settings.full_screen_size.y;
 		if (ssao_half_size) {

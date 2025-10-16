@@ -127,6 +127,7 @@ public:
 		float detail = 0.5;
 		float horizon = 0.06;
 		float sharpness = 0.98;
+		float far_radius;
 
 		Size2i full_screen_size;
 	};
@@ -349,7 +350,9 @@ private:
 		float NDC_to_view_mul[2];
 		float NDC_to_view_add[2];
 
-		float pad[2];
+		//float pad[2];
+		float far_radius;
+		float pad;
 		float half_screen_pixel_size_x025[2];
 
 		float radius;

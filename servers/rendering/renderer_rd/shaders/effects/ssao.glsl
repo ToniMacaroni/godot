@@ -96,7 +96,9 @@ layout(push_constant, std430) uniform Params {
 	vec2 NDC_to_view_mul;
 	vec2 NDC_to_view_add;
 
-	vec2 pad2;
+	//vec2 pad2;
+float far_radius;
+float pad;
 	vec2 half_screen_pixel_size_x025;
 
 	float radius;
@@ -148,6 +150,7 @@ void calculate_radius_parameters(const float p_pix_center_length, const vec2 p_p
 	const float too_close_limit = clamp(p_pix_center_length * params.inv_radius_near_limit, 0.0, 1.0) * 0.8 + 0.2;
 
 	r_radius *= too_close_limit;
+    r_radius *= 1. + clamp((p_pix_center_length - 2.) * params.far_radius, 0., 1.);
 
 	// 0.85 is to reduce the radius to allow for more samples on a slope to still stay within influence
 	r_lookup_radius = (0.85 * r_radius) / p_pixel_size_at_center.x;
