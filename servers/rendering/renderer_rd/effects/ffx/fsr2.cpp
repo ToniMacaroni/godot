@@ -257,7 +257,6 @@ FSR2Effect::FSR2Effect() {
 		pass.sampled_texture_bindings = {
 			FfxResourceBinding{ 0, 0, 0, L"r_input_opaque_only" },
 			FfxResourceBinding{ 1, 0, 0, L"r_input_color_jittered" },
-			FfxResourceBinding{ 13, 0, 0, L"r_input_depth" },
 		};
 
 		pass.storage_texture_bindings = {
@@ -285,6 +284,7 @@ FSR2Effect::FSR2Effect() {
 			FfxResourceBinding{ 4, 0, 0, L"r_input_prev_color_post_alpha" },
 			FfxResourceBinding{ 5, 0, 0, L"r_reactive_mask" },
 			FfxResourceBinding{ 6, 0, 0, L"r_transparency_and_composition_mask" },
+			FfxResourceBinding{ 13, 0, 0, L"r_input_depth" },
 		};
 
 		pass.storage_texture_bindings = {
