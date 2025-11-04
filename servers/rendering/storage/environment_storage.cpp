@@ -277,7 +277,7 @@ void RendererEnvironmentStorage::environment_set_tonemap(RID p_env, RS::Environm
 		env->tonemap_parameters.tonemap_b = awp_toe_a;
 		env->tonemap_parameters.tonemap_c = awp_slope;
 		env->tonemap_parameters.tonemap_d = awp_w;
-	}
+	} 
 }
 
 RS::EnvironmentToneMapper RendererEnvironmentStorage::environment_get_tone_mapper(RID p_env) const {
@@ -552,7 +552,7 @@ Vector<float> RendererEnvironmentStorage::environment_get_glow_levels(RID p_env)
 
 float RendererEnvironmentStorage::environment_get_glow_intensity(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
-	ERR_FAIL_NULL_V(env, 0.8);
+	ERR_FAIL_NULL_V(env, 0.3);
 	return env->glow_intensity;
 }
 
@@ -576,7 +576,7 @@ float RendererEnvironmentStorage::environment_get_glow_mix(RID p_env) const {
 
 RS::EnvironmentGlowBlendMode RendererEnvironmentStorage::environment_get_glow_blend_mode(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
-	ERR_FAIL_NULL_V(env, RS::ENV_GLOW_BLEND_MODE_SOFTLIGHT);
+	ERR_FAIL_NULL_V(env, RS::ENV_GLOW_BLEND_MODE_SCREEN);
 	return env->glow_blend_mode;
 }
 
