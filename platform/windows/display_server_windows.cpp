@@ -1328,17 +1328,17 @@ Rect2i DisplayServerWindows::screen_get_usable_rect(int p_screen) const {
 }
 
 typedef struct {
-	int count;
+	int current_index;
 	int screen;
 	int dpi;
 } EnumDpiData;
 
-static int QueryDpiForMonitor(HMONITOR hmon, MONITOR_DPI_TYPE dpiType = MDT_DEFAULT) {
+static int QueryDpiForMonitor(HMONITOR hmon) {
 	int dpiX = 96, dpiY = 96;
 
 	UINT x = 0, y = 0;
 	if (hmon) {
-		HRESULT hr = GetDpiForMonitor(hmon, dpiType, &x, &y);
+		HRESULT hr = GetDpiForMonitor(hmon, MDT_DEFAULT, &x, &y);
 		if (SUCCEEDED(hr) && (x > 0) && (y > 0)) {
 			dpiX = (int)x;
 			dpiY = (int)y;
@@ -1364,11 +1364,13 @@ static int QueryDpiForMonitor(HMONITOR hmon, MONITOR_DPI_TYPE dpiType = MDT_DEFA
 
 static BOOL CALLBACK _MonitorEnumProcDpi(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) {
 	EnumDpiData *data = (EnumDpiData *)dwData;
-	if (data->count == data->screen) {
-		data->dpi = QueryDpiForMonitor(hMonitor);
-	}
 
-	data->count++;
+	data->current_index++;
+
+	if (data->current_index == data->screen) {
+		data->dpi = QueryDpiForMonitor(hMonitor);
+		return FALSE;
+	}
 	return TRUE;
 }
 
@@ -1376,11 +1378,11 @@ int DisplayServerWindows::screen_get_dpi(int p_screen) const {
 	_THREAD_SAFE_METHOD_
 
 	p_screen = _get_screen_index(p_screen);
-	int screen_count = get_screen_count();
-	ERR_FAIL_INDEX_V(p_screen, screen_count, 72);
 
-	EnumDpiData data = { 0, p_screen, 72 };
+	EnumDpiData data = { -1, p_screen, 96 };
 	EnumDisplayMonitors(nullptr, nullptr, _MonitorEnumProcDpi, (LPARAM)&data);
+
+	ERR_FAIL_COND_V_MSG(data.current_index < p_screen, 96, vformat("Screen index %d out of range [0, %d].", p_screen, data.current_index));
 	return data.dpi;
 }
 
@@ -2336,9 +2338,11 @@ void DisplayServerWindows::_get_window_style(bool p_main_window, bool p_initiali
 	r_style |= WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 	r_style_ex |= WS_EX_ACCEPTFILES;
 
-	if (OS::get_singleton()->get_current_rendering_driver_name() == "d3d12") {
+#ifdef DCOMP_ENABLED
+	if (OS::get_singleton()->is_layered_allowed() && OS::get_singleton()->get_current_rendering_driver_name() == "d3d12") {
 		r_style_ex |= WS_EX_NOREDIRECTIONBITMAP;
 	}
+#endif
 }
 
 void DisplayServerWindows::_update_window_style(WindowID p_window, bool p_repaint) {
@@ -2572,6 +2576,9 @@ void DisplayServerWindows::window_set_flag(WindowFlags p_flag, bool p_enabled, W
 		} break;
 		case WINDOW_FLAG_BORDERLESS: {
 			wd.borderless = p_enabled;
+			if (wd.fullscreen) {
+				return;
+			}
 			_update_window_mouse_passthrough(p_window);
 			_update_window_style(p_window);
 			ShowWindow(wd.hWnd, (wd.no_focus || wd.is_popup) ? SW_SHOWNOACTIVATE : SW_SHOW); // Show the window.

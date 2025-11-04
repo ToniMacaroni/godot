@@ -465,6 +465,7 @@ private:
 
 	Ref<Resource> saving_resource;
 	HashSet<Ref<Resource>> saving_resources_in_path;
+	HashMap<Ref<Resource>, List<Node *>> resource_count; // Keeps track of linked Resources from a Scene.
 
 	uint64_t update_spinner_step_msec = 0;
 	uint64_t update_spinner_step_frame = 0;
@@ -477,6 +478,7 @@ private:
 	SceneImportSettingsDialog *scene_import_settings = nullptr;
 	AudioStreamImportSettingsDialog *audio_stream_import_settings = nullptr;
 
+	HashSet<String> force_textfile_extensions;
 	HashSet<String> textfile_extensions;
 	HashSet<String> other_file_extensions;
 	HashSet<FileDialog *> file_dialogs;
@@ -695,7 +697,7 @@ private:
 	void _feature_profile_changed();
 	bool _is_class_editor_disabled_by_feature_profile(const StringName &p_class);
 
-	Ref<Texture2D> _get_class_or_script_icon(const String &p_class, const String &p_script_path, const String &p_fallback = "Object", bool p_fallback_script_to_theme = false);
+	Ref<Texture2D> _get_class_or_script_icon(const String &p_class, const String &p_script_path, const String &p_fallback = "", bool p_fallback_script_to_theme = false, bool p_skip_fallback_virtual = false);
 	Ref<Texture2D> _get_editor_theme_native_menu_icon(const StringName &p_name, bool p_global_menu, bool p_dark_mode) const;
 
 	void _pick_main_scene_custom_action(const String &p_custom_action_name);
@@ -730,6 +732,7 @@ public:
 	void _on_plugin_ready(Object *p_script, const String &p_activate_name);
 
 	bool call_build();
+	void call_run_scene(const String &p_scene, Vector<String> &r_args);
 
 	// This is a very naive estimation, but we need something now. Will be reworked later.
 	bool is_editor_ready() const { return is_inside_tree() && !waiting_for_first_scan; }
@@ -807,6 +810,13 @@ public:
 	void save_resource_in_path(const Ref<Resource> &p_resource, const String &p_path);
 	void save_resource(const Ref<Resource> &p_resource);
 	void save_resource_as(const Ref<Resource> &p_resource, const String &p_at_path = String());
+	bool is_resource_internal_to_scene(Ref<Resource> p_resource);
+	void gather_resources(const Variant &p_variant, List<Ref<Resource>> &r_list, bool p_subresources = false, bool p_allow_external = false);
+	void update_resource_count(Node *p_node, bool p_remove = false);
+	void update_node_reference(const Variant &p_value, Node *p_node, bool p_remove = false);
+	void clear_node_reference(Ref<Resource> p_res);
+	int get_resource_count(Ref<Resource> p_res);
+	List<Node *> get_resource_node_list(Ref<Resource> p_res);
 
 	void show_about() { _menu_option_confirm(HELP_ABOUT, false); }
 
@@ -936,7 +946,7 @@ public:
 
 	Ref<Script> get_object_custom_type_base(const Object *p_object) const;
 	StringName get_object_custom_type_name(const Object *p_object) const;
-	Ref<Texture2D> get_object_icon(const Object *p_object, const String &p_fallback = "Object");
+	Ref<Texture2D> get_object_icon(const Object *p_object, const String &p_fallback = "");
 	Ref<Texture2D> get_class_icon(const String &p_class, const String &p_fallback = "");
 
 	bool is_object_of_custom_type(const Object *p_object, const StringName &p_class);
