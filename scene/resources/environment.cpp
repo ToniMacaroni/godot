@@ -1120,6 +1120,15 @@ float Environment::get_cs_opacity() const {
 	return cs_opacity;
 }
 
+void Environment::set_cs_shadowmap_dep(float p_shadowmap_dep) {
+	cs_shadowmap_dep = p_shadowmap_dep;
+	_update_cs();
+}
+
+float Environment::get_cs_shadowmap_dep() const {
+	return cs_shadowmap_dep;
+}
+
 void Environment::_update_adjustment() {
 	RID color_correction = adjustment_color_correction.is_valid() ? adjustment_color_correction->get_rid() : RID();
 
@@ -1140,7 +1149,8 @@ void Environment::_update_cs() {
 		environment,
 		cs_thickness,
 		cs_max_dist,
-		cs_opacity);
+		cs_opacity,
+		cs_shadowmap_dep);
 }
 
 // Private methods, constructor and destructor
@@ -1619,11 +1629,14 @@ void Environment::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_cs_max_dist"), &Environment::get_cs_max_dist);
 	ClassDB::bind_method(D_METHOD("set_cs_opacity"), &Environment::set_cs_opacity);
 	ClassDB::bind_method(D_METHOD("get_cs_opacity"), &Environment::get_cs_opacity);
+	ClassDB::bind_method(D_METHOD("set_cs_shadowmap_dep"), &Environment::set_cs_shadowmap_dep);
+	ClassDB::bind_method(D_METHOD("get_cs_shadowmap_dep"), &Environment::get_cs_shadowmap_dep);
 
 	ADD_GROUP("Contact Shadows", "cs_");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_thickness", PROPERTY_HINT_RANGE, "0.00,1.0,0.01"), "set_cs_thickness", "get_cs_thickness");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_max_dist", PROPERTY_HINT_RANGE, "0.00,1.0,0.01"), "set_cs_max_dist", "get_cs_max_dist");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_thickness", PROPERTY_HINT_RANGE, "0.00,2.0,0.01"), "set_cs_thickness", "get_cs_thickness");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_max_dist", PROPERTY_HINT_RANGE, "0.00,2.0,0.01"), "set_cs_max_dist", "get_cs_max_dist");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_opacity", PROPERTY_HINT_RANGE, "0.00,1.0,0.01"), "set_cs_opacity", "get_cs_opacity");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cs_shadowmap_dep", PROPERTY_HINT_RANGE, "0.00,0.99,0.01"), "set_cs_shadowmap_dep", "get_cs_shadowmap_dep");
 
 	// Constants
 

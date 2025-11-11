@@ -166,7 +166,7 @@ public:
 
 	void do_ca(RID p_diffuse, const Size2i &p_screen_size, float p_ca_strength);
 	void do_sharpen(RID p_diffuse, const Size2i &p_screen_size, float p_sharpen_strength);
-	void gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buffers, float p_thickness, float p_max_dist, float p_opacity, Transform3D light_dir, Projection p_projection, Transform3D p_view);
+	void gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_normal_roughness, RID p_ambient_tex, float p_thickness, float p_max_dist, float p_opacity, float p_shadowmap_dep, Transform3D light_dir, Projection p_projection, Transform3D p_view);
 
 private:
 	/* Settings */
@@ -574,8 +574,9 @@ private:
 
 		float max_dist;
 		float opacity;
+		float shadowmap_dep;
 
-		uint32_t pad[2];
+		uint32_t pad;
 	};
 
 	struct ScreenSpaceShadowsData {
@@ -587,7 +588,7 @@ private:
 
 	struct ScreenSpaceShadows {
 		ScreenSpaceShadowsPushConstant push_constant;
-		ScreenSpaceShadowsShaderRD shader;
+		RID shader;
 		RID shader_version;
 		RID pipelines[1];
 		RID ubo;

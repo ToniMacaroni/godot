@@ -681,7 +681,8 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 
 		if (can_use_effects && p_render_data->environment.is_valid() && environment_get_glow_enabled(p_render_data->environment)) {
 			tonemap.use_glow = true;
-			tonemap.glow_mode = environment_get_glow_blend_mode(p_render_data->environment);
+			// tonemap.glow_mode = environment_get_glow_blend_mode(p_render_data->environment);
+			tonemap.glow_mode = RendererRD::ToneMapper::TonemapSettings::GLOW_MODE_SCREEN;
 			tonemap.glow_intensity = tonemap.glow_mode == RS::ENV_GLOW_BLEND_MODE_MIX ? environment_get_glow_mix(p_render_data->environment) : environment_get_glow_intensity(p_render_data->environment);
 			for (int i = 0; i < RS::MAX_GLOW_LEVELS; i++) {
 				tonemap.glow_levels[i] = environment_get_glow_levels(p_render_data->environment)[i];
@@ -749,13 +750,24 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 
 		RID dest_fb;
 		RD::DataFormat dest_fb_format;
+		RD::DataFormat format_for_debanding;
 		if (spatial_upscaler != nullptr || use_smaa) {
 			// If we use a spatial upscaler to upscale or SMAA to antialias we need to write our result into an intermediate buffer.
 			// Note that this is cached so we only create the texture the first time.
 			dest_fb_format = rb->get_base_data_format();
 			RID dest_texture = rb->create_texture(SNAME("Tonemapper"), SNAME("destination"), dest_fb_format, RD::TEXTURE_USAGE_SAMPLING_BIT | RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT, RD::TEXTURE_SAMPLES_1, Size2i(), 0, 1, true, true);
 			dest_fb = FramebufferCacheRD::get_singleton()->get_cache(dest_texture);
-			tonemap.dest_texture_size = rb->get_internal_size();
+			if (use_smaa) {
+				format_for_debanding = dest_fb_format;
+			} else {
+				// Debanding is currently not supported when using spatial upscaling, so apply it before scaling.
+				// This produces suboptimal results because the image will be modified by spatial upscaling after
+				// debanding has been applied. Ideally, debanding should be applied as the final step before quantization
+				// to integer values, but in the case of MetalFX, it may not be worth the performance cost of creating a new
+				// intermediate buffer. In the case of FSR 1.0, the work of adding debanding support hasn't been done yet.
+				// Assume that the DataFormat that will be used by spatial_upscaler is the same as render_target_get_color_format.
+				format_for_debanding = texture_storage->render_target_get_color_format(using_hdr, tonemap.convert_to_srgb);
+			}
 		} else {
 			// If we do a bilinear upscale we just render into our render target and our shader will upscale automatically.
 			// Target size in this case is lying as we never get our real target size communicated.
@@ -763,27 +775,28 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 
 			if (dest_is_msaa_2d) {
 				dest_fb = FramebufferCacheRD::get_singleton()->get_cache(texture_storage->render_target_get_rd_texture_msaa(render_target));
+				// Assume that the DataFormat of render_target_get_rd_texture_msaa is the same as render_target_get_color_format.
+				format_for_debanding = texture_storage->render_target_get_color_format(using_hdr, tonemap.convert_to_srgb);
 				texture_storage->render_target_set_msaa_needs_resolve(render_target, true); // Make sure this gets resolved.
 			} else {
 				dest_fb = texture_storage->render_target_get_rd_framebuffer(render_target);
+				// Assume that the DataFormat of render_target_get_rd_framebuffer is the same as render_target_get_color_format.
+				format_for_debanding = texture_storage->render_target_get_color_format(using_hdr, tonemap.convert_to_srgb);
 			}
-			tonemap.dest_texture_size = texture_storage->render_target_get_size(render_target);
 		}
 
-		tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_DISABLED;
-		if (rb->get_use_debanding() && !using_hdr) {
-			if (!can_use_storage && (use_smaa || spatial_upscaler)) {
-				tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_10_BIT;
-			} else if (!(use_smaa || spatial_upscaler)) {
+		if (rb->get_use_debanding()) {
+			if (true) {
 				tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_8_BIT;
+			} else {
+				// In this case, debanding will be handled later when quantizing to an integer data format. (During blit or SMAA, for example.)
+				tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_DISABLED;
 			}
+		} else {
+			tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_DISABLED;
 		}
 
-		if (can_use_storage) {
-			tone_mapper->tonemapper(color_texture, dest_fb, tonemap);
-		} else {
-			tone_mapper->tonemapper_mobile(color_texture, dest_fb, tonemap);
-		}
+		tone_mapper->tonemapper(color_texture, dest_fb, tonemap);
 
 		RD::get_singleton()->draw_command_end_label();
 	}
@@ -933,12 +946,21 @@ void RendererSceneRenderRD::_post_process_subpass(RID p_source_texture, RID p_fr
 	tonemap.view_count = rb->get_view_count();
 
 	if (rb->get_use_debanding()) {
-		tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_8_BIT;
+		// Assume that the DataFormat of p_framebuffer is the same as render_target_get_color_format.
+		RD::DataFormat dest_fb_format = texture_storage->render_target_get_color_format(using_hdr, tonemap.convert_to_srgb);
+		if (dest_fb_format >= RD::DATA_FORMAT_R8_UNORM && dest_fb_format <= RD::DATA_FORMAT_A8B8G8R8_SRGB_PACK32) {
+			tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_8_BIT;
+		} else if (dest_fb_format >= RD::DATA_FORMAT_A2R10G10B10_UNORM_PACK32 && dest_fb_format <= RD::DATA_FORMAT_A2B10G10R10_SINT_PACK32) {
+			tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_10_BIT;
+		} else {
+			// In this case, debanding will be handled later when quantizing to an integer data format. (During blit, for example.)
+			tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_DISABLED;
+		}
 	} else {
 		tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_DISABLED;
 	}
 
-	tone_mapper->tonemapper_subpass(draw_list, p_source_texture, RD::get_singleton()->framebuffer_get_format(p_framebuffer), tonemap);
+	tone_mapper->tonemapper(draw_list, p_source_texture, RD::get_singleton()->framebuffer_get_format(p_framebuffer), tonemap);
 
 	RD::get_singleton()->draw_command_end_label();
 }
@@ -1508,6 +1530,14 @@ float RendererSceneRenderRD::screen_space_roughness_limiter_get_limit() const {
 	return screen_space_roughness_limiter_limit;
 }
 
+void RendererSceneRenderRD::micro_shadowing_set_amount(float p_amount) {
+	micro_shadowing = p_amount;
+}
+
+float RendererSceneRenderRD::micro_shadowing_get_amount() const {
+	return micro_shadowing;
+}
+
 TypedArray<Image> RendererSceneRenderRD::bake_render_uv2(RID p_base, const TypedArray<RID> &p_material_overrides, const Size2i &p_image_size) {
 	ERR_FAIL_COND_V_MSG(p_image_size.width <= 0, TypedArray<Image>(), "Image width must be greater than 0.");
 	ERR_FAIL_COND_V_MSG(p_image_size.height <= 0, TypedArray<Image>(), "Image height must be greater than 0.");
@@ -1674,6 +1704,7 @@ void RendererSceneRenderRD::init() {
 	screen_space_roughness_limiter_amount = GLOBAL_GET("rendering/anti_aliasing/screen_space_roughness_limiter/amount");
 	screen_space_roughness_limiter_limit = GLOBAL_GET("rendering/anti_aliasing/screen_space_roughness_limiter/limit");
 	glow_bicubic_upscale = int(GLOBAL_GET("rendering/environment/glow/upscale_mode")) > 0;
+	micro_shadowing = GLOBAL_GET("rendering/environment/ssao/micro_shadow");
 
 	directional_penumbra_shadow_kernel = memnew_arr(float, 128);
 	directional_soft_shadow_kernel = memnew_arr(float, 128);
@@ -1699,7 +1730,7 @@ void RendererSceneRenderRD::init() {
 	debug_effects = memnew(RendererRD::DebugEffects);
 	luminance = memnew(RendererRD::Luminance(!can_use_storage));
 	smaa = memnew(RendererRD::SMAA);
-	tone_mapper = memnew(RendererRD::ToneMapper(!can_use_storage));
+	tone_mapper = memnew(RendererRD::ToneMapper);
 	if (can_use_vrs) {
 		vrs = memnew(RendererRD::VRS);
 	}

@@ -1023,6 +1023,9 @@ layout(location = 1) out vec4 specular_buffer; //specular and SSS (subsurface sc
 #else
 
 layout(location = 0) out vec4 frag_color;
+#ifdef SSS_OPAQUE
+layout(location = 1) out vec4 misc_color;
+#endif
 #endif // MODE_SEPARATE_SPECULAR
 
 #endif // RENDER DEPTH
@@ -1221,9 +1224,16 @@ void fragment_shader(in SceneData scene_data) {
 #endif
 
 	float ao = 1.0;
+    float direct_ao = 0.0;
 	float ao_light_affect = 0.0;
 
 	float alpha_highp = float(instances.data[instance_index].flags >> INSTANCE_FLAGS_FADE_SHIFT) / float(255.0);
+
+    float ss_shadow_strength = 0.;
+    float ss_shadow_length = 0.15;
+    float ss_shadow_thickness = 0.4;
+
+    float microshadow_strength = 1.;
 
 #ifdef TANGENT_USED
 	vec3 binormal = binormal_interp;
@@ -1461,21 +1471,20 @@ void fragment_shader(in SceneData scene_data) {
 #else
 		vec4 volumetric_fog = volumetric_fog_process(screen_uv, -vertex.z);
 #endif
-		vec4 res = vec4(0.0);
 		if (bool(scene_data.flags & SCENE_DATA_FLAGS_USE_FOG)) {
 			//must use the full blending equation here to blend fogs
+			vec4 res;
 			float sa = 1.0 - volumetric_fog.a;
 			res.a = fog.a * sa + volumetric_fog.a;
-			if (res.a > 0.0) {
-				res.rgb = (fog.rgb * fog.a * sa + volumetric_fog.rgb) / res.a;
+			if (res.a == 0.0) {
+				res.rgb = vec3(0.0);
+			} else {
+				res.rgb = (fog.rgb * fog.a * sa + volumetric_fog.rgb * volumetric_fog.a) / res.a;
 			}
+			fog = res;
 		} else {
-			res.a = volumetric_fog.a;
-			if (res.a > 0.0) {
-				res.rgb = volumetric_fog.rgb / res.a;
-			}
+			fog = volumetric_fog;
 		}
-		fog = res;
 	}
 #endif //!CUSTOM_FOG_USED
 
@@ -1612,7 +1621,7 @@ void fragment_shader(in SceneData scene_data) {
 		//https://www.jp.square-enix.com/tech/library/pdf/ImprovedGeometricSpecularAA.pdf
 		float roughness2 = roughness * roughness;
 		vec3 dndu = dFdx(normal), dndv = dFdy(normal);
-		float variance = scene_data.roughness_limiter_amount * (dot(dndu, dndu) + dot(dndv, dndv));
+		float variance = /*scene_data.roughness_limiter_amount*/0.25 * (dot(dndu, dndu) + dot(dndv, dndv));
 		float kernelRoughness2 = min(2.0 * variance, scene_data.roughness_limiter_limit); //limit effect
 		float filteredRoughness2 = min(1.0, roughness2 + kernelRoughness2);
 		roughness = sqrt(filteredRoughness2);
@@ -2148,7 +2157,7 @@ void fragment_shader(in SceneData scene_data) {
 #endif // AMBIENT_LIGHT_DISABLED
 
 	// convert ao to direct light ao
-	ao = mix(1.0, ao, ao_light_affect);
+	direct_ao = mix(1.0, ao, ao_light_affect);
 
 	//this saves some VGPRs
 	vec3 f0 = F0(metallic, specular, albedo);
@@ -2560,6 +2569,10 @@ void fragment_shader(in SceneData scene_data) {
 			shadow = 1.0;
 #endif
 
+			shadow *= dot(normal, directional_lights.data[i].direction) >= 0.0
+                ? compute_micro_shadowing(NdotL, ao, scene_data.micro_shadow_amount * microshadow_strength)
+                : 1.0;
+
 			float size_A = sc_use_directional_soft_shadows() ? directional_lights.data[i].size : 0.0;
 
 			light_compute(-vertex.z, normal, directional_lights.data[i].direction, normalize(view), size_A,
@@ -2590,7 +2603,11 @@ void fragment_shader(in SceneData scene_data) {
 #endif
 					diffuse_light,
 					direct_specular_light);
+
+
 		}
+
+
 #endif // USE_VERTEX_LIGHTING
 	}
 
@@ -2846,7 +2863,7 @@ void fragment_shader(in SceneData scene_data) {
 	normal_output_buffer.a = 0.0;
 	depth_output_buffer.r = -vertex.z;
 
-	orm_output_buffer.r = ao;
+	orm_output_buffer.r = direct_ao;
 	orm_output_buffer.g = roughness;
 	orm_output_buffer.b = metallic;
 	orm_output_buffer.a = sss_strength;
@@ -2883,12 +2900,17 @@ void fragment_shader(in SceneData scene_data) {
 //nothing happens, so a tree-ssa optimizer will result in no fragment shader :)
 #else
 
+    #if !defined(MODE_RENDER_DEPTH) && !defined(MODE_SEPARATE_SPECULAR) && defined(SSS_OPAQUE)
+    //misc_color = vec4(ss_shadow_strength, 1., 1., 1.);
+    misc_color = vec4(clamp(diffuse_light.r, 0., 1.) * ss_shadow_strength, 1., 1., 1.);
+    #endif
+
 	// multiply by albedo
 	diffuse_light *= albedo; // ambient must be multiplied by albedo at the end
 
 	// apply direct light AO
-	diffuse_light *= ao;
-	direct_specular_light *= ao;
+	diffuse_light *= direct_ao;
+	direct_specular_light *= direct_ao;
 
 	// apply metallic
 	diffuse_light *= 1.0 - metallic;
@@ -2933,6 +2955,9 @@ void fragment_shader(in SceneData scene_data) {
 #ifndef FOG_DISABLED
 	// Draw "fixed" fog before volumetric fog to ensure volumetric fog can appear in front of the sky.
 	frag_color.rgb = mix(frag_color.rgb, fog.rgb, fog.a);
+	#if !defined(MODE_RENDER_DEPTH) && !defined(MODE_SEPARATE_SPECULAR) && defined(SSS_OPAQUE)
+    misc_color.r *= 1.-fog.a;
+    #endif
 #endif //!FOG_DISABLED
 
 #endif //MODE_SEPARATE_SPECULAR

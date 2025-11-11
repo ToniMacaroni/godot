@@ -835,7 +835,7 @@ public:
 
 	FUNC9(environment_set_adjustment, RID, bool, float, float, float, bool, RID, float, float)
 
-	FUNC4(environment_set_cs, RID, float, float, float)
+	FUNC5(environment_set_cs, RID, float, float, float, float)
 
 	FUNC11(environment_set_fog, RID, bool, const Color &, float, float, float, float, float, float, float, EnvironmentFogMode)
 
@@ -855,6 +855,8 @@ public:
 	FUNC3(screen_space_roughness_limiter_set_active, bool, float, float)
 	FUNC1(sub_surface_scattering_set_quality, SubSurfaceScatteringQuality)
 	FUNC2(sub_surface_scattering_set_scale, float, float)
+
+	FUNC1(micro_shadowing_set_amount, float)
 
 	FUNC1(positional_soft_shadow_filter_set_quality, ShadowQuality);
 	FUNC1(directional_soft_shadow_filter_set_quality, ShadowQuality);

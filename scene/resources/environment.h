@@ -229,6 +229,7 @@ private:
 	float cs_thickness = 0.1f;
 	float cs_max_dist = 0.1f;
 	float cs_opacity = 0.8f;
+	float cs_shadowmap_dep = 0.85f;
 
 protected:
 	static void _bind_methods();
@@ -464,6 +465,8 @@ public:
 	float get_cs_max_dist() const;
 	void set_cs_opacity(float opacity);
 	float get_cs_opacity() const;
+	void set_cs_shadowmap_dep(float p_shadowmap_dep);
+	float get_cs_shadowmap_dep() const;
 
 	Environment();
 	~Environment();

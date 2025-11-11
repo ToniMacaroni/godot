@@ -316,6 +316,10 @@ uint16_t SceneShaderForwardClustered::ShaderData::_get_shader_version(PipelineVe
 				shader_flags |= SHADER_COLOR_PASS_FLAG_MULTIVIEW;
 			}
 
+			if (p_color_pass_flags & PIPELINE_COLOR_PASS_FLAG_OPAQUE) {
+				shader_flags |= SHADER_COLOR_PASS_FLAG_OPAQUE;
+			}
+
 			return ShaderVersion::SHADER_VERSION_COLOR_PASS * 2 + shader_flags;
 		} break;
 		default: {
@@ -345,6 +349,7 @@ void SceneShaderForwardClustered::ShaderData::_create_pipeline(PipelineKey p_pip
 	RD::PipelineColorBlendState blend_state_color_blend;
 	blend_state_color_blend.attachments = { blend_attachment, RD::PipelineColorBlendState::Attachment(), RD::PipelineColorBlendState::Attachment() };
 	RD::PipelineColorBlendState blend_state_color_opaque = RD::PipelineColorBlendState::create_disabled(3);
+	RD::PipelineColorBlendState blend_state_color_opaque2 = RD::PipelineColorBlendState::create_disabled(3);
 	RD::PipelineColorBlendState blend_state_depth_normal_roughness = RD::PipelineColorBlendState::create_disabled(1);
 	RD::PipelineColorBlendState blend_state_depth_normal_roughness_giprobe = RD::PipelineColorBlendState::create_disabled(2);
 
@@ -437,7 +442,12 @@ void SceneShaderForwardClustered::ShaderData::_create_pipeline(PipelineKey p_pip
 				depth_stencil_state.enable_depth_write = false; //alpha does not draw depth
 			}
 		} else {
-			blend_state = blend_state_color_opaque;
+			// blend_state = blend_state_color_opaque;
+			if (p_pipeline_key.color_pass_flags & PIPELINE_COLOR_PASS_FLAG_OPAQUE) {
+				blend_state = blend_state_color_opaque2;
+			} else {
+				blend_state = blend_state_color_opaque;
+			}
 
 			if (depth_pre_pass_enabled) {
 				// We already have a depth from the depth pre-pass, there is no need to write it again.
@@ -643,6 +653,7 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 			"\n#define USE_LIGHTMAP\n", // SHADER_COLOR_PASS_FLAG_LIGHTMAP
 			"\n#define USE_MULTIVIEW\n", // SHADER_COLOR_PASS_FLAG_MULTIVIEW
 			"\n#define MOTION_VECTORS\n", // SHADER_COLOR_PASS_FLAG_MOTION_VECTORS
+			"\n#define SSS_OPAQUE\n", // SHADER_COLOR_PASS_FLAG_OPAQUE
 		};
 
 		for (int i = 0; i < SHADER_COLOR_PASS_FLAG_COUNT; i++) {
@@ -763,6 +774,10 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.renames["CUSTOM2"] = "custom2_attrib";
 		actions.renames["CUSTOM3"] = "custom3_attrib";
 		actions.renames["LIGHT_VERTEX"] = "light_vertex";
+		actions.renames["SS_SHADOW_STRENGTH"] = "ss_shadow_strength";
+		actions.renames["SS_SHADOW_LENGTH"] = "ss_shadow_length";
+		actions.renames["SS_SHADOW_THICKNESS"] = "ss_shadow_thickness";
+		actions.renames["MICROSHADOW_STRENGTH"] = "microshadow_strength";
 
 		actions.renames["NODE_POSITION_WORLD"] = "read_model_matrix[3].xyz";
 		actions.renames["CAMERA_POSITION_WORLD"] = "inv_view_matrix[3].xyz";

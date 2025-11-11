@@ -167,6 +167,8 @@ private:
 	uint32_t volumetric_fog_depth = 128;
 	bool volumetric_fog_filter_active = true;
 
+	float micro_shadowing = 0.0;
+
 public:
 	static RendererSceneRenderRD *get_singleton() { return singleton; }
 
@@ -262,6 +264,9 @@ public:
 	virtual bool screen_space_roughness_limiter_is_active() const override;
 	virtual float screen_space_roughness_limiter_get_amount() const;
 	virtual float screen_space_roughness_limiter_get_limit() const;
+
+	virtual void micro_shadowing_set_amount(float p_amount) override;
+	virtual float micro_shadowing_get_amount() const;
 
 	virtual void positional_soft_shadow_filter_set_quality(RS::ShadowQuality p_quality) override;
 	virtual void directional_soft_shadow_filter_set_quality(RS::ShadowQuality p_quality) override;

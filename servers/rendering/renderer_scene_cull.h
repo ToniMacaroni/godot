@@ -1369,15 +1369,18 @@ public:
 	PASS1RC(bool, environment_get_use_1d_color_correction, RID)
 	PASS1RC(RID, environment_get_color_correction, RID)
 
-	PASS4(environment_set_cs, RID, float, float, float)
+	PASS5(environment_set_cs, RID, float, float, float, float)
 	PASS1RC(float, environment_get_cs_thickness, RID);
 	PASS1RC(float, environment_get_cs_max_dist, RID);
+	PASS1RC(float, environment_get_cs_shadowmap_dep, RID);
 
 	PASS3R(Ref<Image>, environment_bake_panorama, RID, bool, const Size2i &)
 
 	PASS3(screen_space_roughness_limiter_set_active, bool, float, float)
 	PASS1(sub_surface_scattering_set_quality, RS::SubSurfaceScatteringQuality)
 	PASS2(sub_surface_scattering_set_scale, float, float)
+
+	PASS1(micro_shadowing_set_amount, float)
 
 	PASS1(positional_soft_shadow_filter_set_quality, RS::ShadowQuality)
 	PASS1(directional_soft_shadow_filter_set_quality, RS::ShadowQuality)

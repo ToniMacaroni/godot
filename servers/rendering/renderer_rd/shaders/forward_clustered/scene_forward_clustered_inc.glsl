@@ -410,6 +410,7 @@ layout(set = 1, binding = 26) uniform texture2D normal_roughness_buffer;
 layout(set = 1, binding = 27) uniform texture2D ao_buffer;
 layout(set = 1, binding = 28) uniform texture2D ambient_buffer;
 layout(set = 1, binding = 29) uniform texture2D reflection_buffer;
+//layout(rgba8, set = 1, binding = 35) uniform image2D out_shadow_buffer;
 #define multiviewSampler sampler2D
 #endif
 layout(set = 1, binding = 30) uniform texture2DArray sdfgi_lightprobe_texture;
@@ -468,6 +469,14 @@ vec3 prefiltered_dfg(float lod, float NoV) {
 // https://google.github.io/filament/Filament.html#listing_energycompensationimpl
 vec3 get_energy_compensation(vec3 f0, float env) {
 	return 1.0 + f0 * (1.0 / env - 1.0);
+}
+
+
+// Brinck and Maximov 2016, "The Technical Art of Uncharted 4"
+float compute_micro_shadowing(float NoL, float ao, float opacity) {
+	float aperture = 2.0 * ao * ao;
+	float microshadow = clamp(NoL + aperture - 1.0, 0.0, 1.0);
+	return mix(1.0, microshadow, opacity);
 }
 
 /* Set 2 Skeleton & Instancing (can change per item) */

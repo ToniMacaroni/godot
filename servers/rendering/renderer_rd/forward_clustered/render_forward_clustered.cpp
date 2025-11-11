@@ -70,6 +70,14 @@ void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_normal_rou
 	}
 }
 
+void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_misc_texture() {
+	ERR_FAIL_NULL(render_buffers);
+
+	if (!render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_MISC)) {
+		render_buffers->create_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_MISC, RD::DATA_FORMAT_R8G8B8A8_UNORM, render_buffers->get_color_usage_bits(false, false, true));
+	}
+}
+
 void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_voxelgi() {
 	ERR_FAIL_NULL(render_buffers);
 
@@ -197,20 +205,21 @@ RID RenderForwardClustered::RenderBufferDataForwardClustered::get_color_pass_fb(
 		specular = render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, use_msaa ? RB_TEX_SPECULAR_MSAA : RB_TEX_SPECULAR);
 	}
 
+	RID depth = use_msaa ? render_buffers->get_texture(RB_SCOPE_BUFFERS, RB_TEX_DEPTH_MSAA) : render_buffers->get_depth_texture();
+
 	RID velocity_buffer;
 	if (p_color_pass_flags & COLOR_PASS_FLAG_MOTION_VECTORS) {
 		render_buffers->ensure_velocity();
 		velocity_buffer = render_buffers->get_velocity_buffer(use_msaa);
 	}
 
-	RID depth = use_msaa ? render_buffers->get_texture(RB_SCOPE_BUFFERS, RB_TEX_DEPTH_MSAA) : render_buffers->get_depth_texture();
-
 	if (render_buffers->has_texture(RB_SCOPE_VRS, RB_TEXTURE)) {
 		RID vrs_texture = render_buffers->get_texture(RB_SCOPE_VRS, RB_TEXTURE);
 		return FramebufferCacheRD::get_singleton()->get_cache_multiview(v_count, color, specular, velocity_buffer, depth, vrs_texture);
-	} else {
-		return FramebufferCacheRD::get_singleton()->get_cache_multiview(v_count, color, specular, velocity_buffer, depth);
 	}
+
+	ensure_misc_texture();
+	return FramebufferCacheRD::get_singleton()->get_cache_multiview(v_count, color, (p_color_pass_flags & COLOR_PASS_FLAG_OPAQUE) ? get_misc_texture() : specular, velocity_buffer, depth);
 }
 
 RID RenderForwardClustered::RenderBufferDataForwardClustered::get_depth_fb(DepthFrameBufferType p_type) {
@@ -465,6 +474,10 @@ void RenderForwardClustered::_render_list_template(RenderingDevice::DrawListID p
 					pipeline_key.color_pass_flags |= SceneShaderForwardClustered::PIPELINE_COLOR_PASS_FLAG_MULTIVIEW;
 				}
 
+				if constexpr ((p_color_pass_flags & COLOR_PASS_FLAG_OPAQUE) != 0) {
+					pipeline_key.color_pass_flags |= SceneShaderForwardClustered::PIPELINE_COLOR_PASS_FLAG_OPAQUE;
+				}
+
 				pipeline_key.version = SceneShaderForwardClustered::PIPELINE_VERSION_COLOR_PASS;
 			} break;
 			case PASS_MODE_SHADOW:
@@ -642,6 +655,10 @@ void RenderForwardClustered::_render_list(RenderingDevice::DrawListID p_draw_lis
 				VALID_FLAG_COMBINATION(COLOR_PASS_FLAG_MOTION_VECTORS);
 				VALID_FLAG_COMBINATION(COLOR_PASS_FLAG_SEPARATE_SPECULAR | COLOR_PASS_FLAG_MULTIVIEW | COLOR_PASS_FLAG_MOTION_VECTORS);
 				VALID_FLAG_COMBINATION(COLOR_PASS_FLAG_TRANSPARENT | COLOR_PASS_FLAG_MULTIVIEW | COLOR_PASS_FLAG_MOTION_VECTORS);
+				VALID_FLAG_COMBINATION(COLOR_PASS_FLAG_OPAQUE);
+				VALID_FLAG_COMBINATION(COLOR_PASS_FLAG_OPAQUE | COLOR_PASS_FLAG_MULTIVIEW);
+				VALID_FLAG_COMBINATION(COLOR_PASS_FLAG_OPAQUE | COLOR_PASS_FLAG_MULTIVIEW | COLOR_PASS_FLAG_MOTION_VECTORS);
+				VALID_FLAG_COMBINATION(COLOR_PASS_FLAG_OPAQUE | COLOR_PASS_FLAG_MOTION_VECTORS);
 				default: {
 					ERR_FAIL_MSG("Invalid color pass flag combination " + itos(p_params->color_pass_flags));
 				}
@@ -1829,6 +1846,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 		global_pipeline_data_required.use_reflection_probes = true;
 	} else {
 		screen_size = rb->get_internal_size();
+		color_pass_flags |= COLOR_PASS_FLAG_OPAQUE;
 
 		if (p_render_data->scene_data->calculate_motion_vectors) {
 			color_pass_flags |= COLOR_PASS_FLAG_MOTION_VECTORS;
@@ -1947,6 +1965,10 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 	if (global_surface_data.normal_texture_used && !is_reflection_probe) {
 		rb_data->ensure_normal_roughness_texture();
+	}
+
+	if (!is_reflection_probe) {
+		rb_data->ensure_misc_texture();
 	}
 
 	if (using_sss || using_separate_specular || scene_state.used_lightmap || using_voxelgi || global_surface_data.sss_used) {
@@ -2236,6 +2258,29 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 		_process_compositor_effects(RS::COMPOSITOR_EFFECT_CALLBACK_TYPE_POST_OPAQUE, p_render_data);
 	}
 
+	if (p_render_data->environment.is_valid()) {
+
+		RID directional_light;
+		for (int i = 0; i < p_render_data->render_shadow_count; i++) {
+			RID li = p_render_data->render_shadows[i].light;
+			RID base = light_storage->light_instance_get_base_light(li);
+
+			if (light_storage->light_get_type(base) == RS::LIGHT_DIRECTIONAL) {
+				directional_light = li;
+			}
+		}
+
+		if(directional_light.is_valid() && _render_buffers_get_normal_texture(rb).is_valid()) {
+			RD::get_singleton()->draw_command_begin_label("ScreenSpaceShadows");
+			RENDER_TIMESTAMP("ScreenSpaceShadows");
+			Projection correction;
+			correction.set_depth_correction(true);
+			correction.add_jitter_offset(p_render_data->scene_data->taa_jitter);
+			ss_effects->gen_screen_space_shadows(rb, _render_buffers_get_normal_texture(rb), rb_data->has_misc_texture() ? rb_data->get_misc_texture() : RendererRD::TextureStorage::get_singleton()->texture_rd_get_default(RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_BLACK), environment_get_cs_thickness(p_render_data->environment), environment_get_cs_max_dist(p_render_data->environment), environment_get_cs_opacity(p_render_data->environment), environment_get_cs_shadowmap_dep(p_render_data->environment), light_storage->light_instance_get_base_transform(directional_light), correction * p_render_data->scene_data->view_projection[0], p_render_data->scene_data->cam_transform);
+			RD::get_singleton()->draw_command_end_label();
+		}
+	}
+
 	if (debug_voxelgis) {
 		Projection dc;
 		dc.set_depth_correction(true);
@@ -2390,7 +2435,8 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	_setup_environment(p_render_data, is_reflection_probe, screen_size, p_default_bg_color, false);
 
 	{
-		uint32_t transparent_color_pass_flags = (color_pass_flags | uint32_t(COLOR_PASS_FLAG_TRANSPARENT)) & ~uint32_t(COLOR_PASS_FLAG_SEPARATE_SPECULAR);
+		// uint32_t transparent_color_pass_flags = (color_pass_flags | uint32_t(COLOR_PASS_FLAG_TRANSPARENT)) & ~uint32_t(COLOR_PASS_FLAG_SEPARATE_SPECULAR);
+		uint32_t transparent_color_pass_flags = (color_pass_flags | uint32_t(COLOR_PASS_FLAG_TRANSPARENT)) & ~uint32_t(COLOR_PASS_FLAG_SEPARATE_SPECULAR | COLOR_PASS_FLAG_OPAQUE);
 		// Motion vectors should not be overwritten by transparent objects.
 		transparent_color_pass_flags &= ~uint32_t(COLOR_PASS_FLAG_MOTION_VECTORS);
 
@@ -2450,29 +2496,6 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	// 	_copy_framebuffer_to_ssil(rb);
 	// }
 	// RD::get_singleton()->draw_command_end_label();
-
-	// if (p_render_data->environment.is_valid()) {
-	//
-	// 	RID directional_light;
-	// 	for (int i = 0; i < p_render_data->render_shadow_count; i++) {
-	// 		RID li = p_render_data->render_shadows[i].light;
-	// 		RID base = light_storage->light_instance_get_base_light(li);
-	//
-	// 		if (light_storage->light_get_type(base) == RS::LIGHT_DIRECTIONAL) {
-	// 			directional_light = li;
-	// 		}
-	// 	}
-	//
-	// 	if(directional_light.is_valid()) {
-	// 		RD::get_singleton()->draw_command_begin_label("ScreenSpaceShadows");
-	// 		RENDER_TIMESTAMP("ScreenSpaceShadows");
-	// 		Projection correction;
-	// 		correction.set_depth_correction(true);
-	// 		correction.add_jitter_offset(p_render_data->scene_data->taa_jitter);
-	// 		ss_effects->gen_screen_space_shadows(rb, environment_get_cs_thickness(p_render_data->environment), environment_get_cs_max_dist(p_render_data->environment), environment_get_cs_opacity(p_render_data->environment), light_storage->light_instance_get_base_transform(directional_light), correction * p_render_data->scene_data->view_projection[0], p_render_data->scene_data->cam_transform);
-	// 		RD::get_singleton()->draw_command_end_label();
-	// 	}
-	// }
 
 	if (rb_data.is_valid() && (using_upscaling || using_taa)) {
 		if (scale_type == SCALE_FSR2) {

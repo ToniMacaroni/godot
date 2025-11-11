@@ -47,7 +47,8 @@ struct SceneData {
 	float z_far;
 	float z_near;
 
-	float roughness_limiter_amount;
+	//float roughness_limiter_amount;
+float micro_shadow_amount;
 	float roughness_limiter_limit;
 	float opaque_prepass_threshold;
 	uint flags;

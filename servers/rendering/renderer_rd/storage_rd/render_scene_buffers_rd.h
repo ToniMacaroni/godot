@@ -43,6 +43,7 @@
 #include "servers/rendering/storage/render_scene_buffers.h"
 
 #define RB_SCOPE_BUFFERS SNAME("render_buffers")
+#define SSS_GLOB SNAME("sss_glob")
 #define RB_SCOPE_VRS SNAME("VRS")
 
 #define RB_TEXTURE SNAME("texture")
@@ -54,6 +55,7 @@
 #define RB_TEX_VELOCITY SNAME("velocity")
 #define RB_TEX_VELOCITY_MSAA SNAME("velocity_msaa")
 #define RB_TEX_COLOR_OPAQUE_ONLY SNAME("color_opaque_only")
+#define RB_TEX_OUT_SHADOW SNAME("out_shadow")
 
 #define RB_TEX_BLUR_0 SNAME("blur_0")
 #define RB_TEX_BLUR_1 SNAME("blur_1")

@@ -32,9 +32,11 @@
 
 #include "core/config/project_settings.h"
 #include "servers/rendering/renderer_rd/effects/copy_effects.h"
+#include "core/io/file_access.h"
 #include "servers/rendering/renderer_rd/storage_rd/material_storage.h"
 #include "servers/rendering/renderer_rd/storage_rd/render_scene_buffers_rd.h"
 #include "servers/rendering/renderer_rd/uniform_set_cache_rd.h"
+#include "servers/rendering/renderer_rd/storage_rd/light_storage.h"
 
 using namespace RendererRD;
 
@@ -46,6 +48,23 @@ static _FORCE_INLINE_ void store_camera(const Projection &p_mtx, float *p_array)
 			p_array[i * 4 + j] = p_mtx.columns[i][j];
 		}
 	}
+}
+
+static String _include_function2(const String &p_path, void *userpointer) {
+	Error err;
+
+	String *base_path = (String *)userpointer;
+
+	String include = p_path;
+	if (include.is_relative_path()) {
+		include = base_path->path_join(include);
+	}
+
+	Ref<FileAccess> file_inc = FileAccess::open(include, FileAccess::READ, &err);
+	if (err != OK) {
+		return String();
+	}
+	return file_inc->get_as_utf8_string();
 }
 
 SSEffects::SSEffects() {
@@ -389,10 +408,26 @@ SSEffects::SSEffects() {
 		Vector<String> sss_modes;
 		sss_modes.push_back("\n");
 
-		screen_space_shadows.shader.initialize(sss_modes);
-		screen_space_shadows.shader_version = screen_space_shadows.shader.version_create();
+		Error err;
+		String filepath = "G:\\repos\\godot\\servers\\rendering\\renderer_rd\\shaders\\effects\\screen_space_shadows.glsl";
+		Ref<FileAccess> file = FileAccess::open(filepath, FileAccess::READ, &err);
+		String file_txt = file->get_as_utf8_string();
 
-		screen_space_shadows.pipelines[0] = RD::get_singleton()->compute_pipeline_create(screen_space_shadows.shader.version_get_shader(screen_space_shadows.shader_version, 0));
+		Ref<RDShaderFile> sss_shader;
+		sss_shader.instantiate();
+		String base_path = filepath.get_base_dir();
+		err = sss_shader->parse_versions_from_text(file_txt, "", _include_function2, &base_path);
+		if (err != OK) {
+			sss_shader->print_errors("sss shader");
+		} else {
+			screen_space_shadows.shader = RD::get_singleton()->shader_create_from_spirv(sss_shader->get_spirv_stages());
+			screen_space_shadows.pipelines[0] = RD::get_singleton()->compute_pipeline_create(screen_space_shadows.shader);
+		}
+
+		//screen_space_shadows.shader.initialize(sss_modes);
+		//screen_space_shadows.shader_version = screen_space_shadows.shader.version_create();
+
+		//screen_space_shadows.pipelines[0] = RD::get_singleton()->compute_pipeline_create(screen_space_shadows.shader.version_get_shader(screen_space_shadows.shader_version, 0));
 	}
 }
 
@@ -535,9 +570,12 @@ SSEffects::~SSEffects() {
 
 	{
 		// Cleanup ScreenSpaceShadows
-		screen_space_shadows.shader.version_free(screen_space_shadows.shader_version);
+		//screen_space_shadows.shader.version_free(screen_space_shadows.shader_version);
+		if (screen_space_shadows.shader.is_valid()) {
+			RD::get_singleton()->free_rid(screen_space_shadows.shader);
+		}
 		if (screen_space_shadows.ubo.is_valid()) {
-			RD::get_singleton()->free(screen_space_shadows.ubo);
+			RD::get_singleton()->free_rid(screen_space_shadows.ubo);
 		}
 	}
 
@@ -1931,7 +1969,7 @@ void SSEffects::do_sharpen(RID p_diffuse, const Size2i &p_screen_size, float p_s
 	}
 }
 
-void SSEffects::gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buffers, float p_thickness, float p_max_dist, float p_opacity, Transform3D light_dir, Projection p_projection, Transform3D p_view) {
+void SSEffects::gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buffers, RID p_normal_roughness, RID p_ambient_tex, float p_thickness, float p_max_dist, float p_opacity, float p_shadowmap_dep, Transform3D light_dir, Projection p_projection, Transform3D p_view) {
 	UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
 	ERR_FAIL_NULL(uniform_set_cache);
 	MaterialStorage *material_storage = MaterialStorage::get_singleton();
@@ -1942,6 +1980,8 @@ void SSEffects::gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buff
 	auto diffuse = p_render_buffers->get_internal_texture();
 	auto depth = p_render_buffers->get_depth_texture();
 	auto dir = light_dir.basis.get_quaternion().normalized().xform(Vector3(0, 0, -1));
+	auto directional_shadows = RendererRD::LightStorage::get_singleton()->directional_shadow_get_texture();
+	auto directional_lights = RendererRD::LightStorage::get_singleton()->get_directional_light_buffer();
 
 	ScreenSpaceShadowsData data;
 
@@ -1959,6 +1999,7 @@ void SSEffects::gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buff
 	screen_space_shadows.push_constant.thickness = p_thickness;
 	screen_space_shadows.push_constant.max_dist = p_max_dist;
 	screen_space_shadows.push_constant.opacity = p_opacity;
+	screen_space_shadows.push_constant.shadowmap_dep = p_shadowmap_dep;
 	// printf("Light: %f %f %f\n", dir.x, dir.y, dir.z);
 	MaterialStorage::store_camera(p_projection, data.proj);
 	MaterialStorage::store_camera(p_projection.inverse(), data.proj_inv);
@@ -1976,15 +2017,23 @@ void SSEffects::gen_screen_space_shadows(Ref<RenderSceneBuffersRD> p_render_buff
 
 	RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
 
-	RID shader = screen_space_shadows.shader.version_get_shader(screen_space_shadows.shader_version, 0);
+	// RID shader = screen_space_shadows.shader.version_get_shader(screen_space_shadows.shader_version, 0);
 	RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, screen_space_shadows.pipelines[0]);
 
 	RD::Uniform u_diffuse(RD::UNIFORM_TYPE_IMAGE, 0, Vector<RID>({ diffuse }));
-	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_diffuse), 0);
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(screen_space_shadows.shader, 0, u_diffuse), 0);
 	RD::Uniform u_depthsampler(RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, Vector<RID>({ default_sampler, depth }));
-	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 1, u_depthsampler), 1);
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(screen_space_shadows.shader, 1, u_depthsampler), 1);
+	RD::Uniform u_directional_shadows(RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, Vector<RID>({ default_sampler, directional_shadows }));
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(screen_space_shadows.shader, 2, u_directional_shadows), 2);
 	RD::Uniform u_data(RD::UNIFORM_TYPE_UNIFORM_BUFFER, 0, screen_space_shadows.ubo);
-	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 2, u_data), 2);
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(screen_space_shadows.shader, 3, u_data), 3);
+	RD::Uniform u_directional_lights(RD::UNIFORM_TYPE_UNIFORM_BUFFER, 0, directional_lights);
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(screen_space_shadows.shader, 4, u_directional_lights), 4);
+	RD::Uniform u_normal_buffer(RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, Vector<RID>({ default_sampler, p_normal_roughness }));
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(screen_space_shadows.shader, 5, u_normal_buffer), 5);
+	RD::Uniform u_ambient_tex(RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, Vector<RID>({ default_sampler, p_ambient_tex }));
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(screen_space_shadows.shader, 6, u_ambient_tex), 6);
 
 	RD::get_singleton()->compute_list_set_push_constant(compute_list, &screen_space_shadows.push_constant, sizeof(ScreenSpaceShadowsPushConstant));
 

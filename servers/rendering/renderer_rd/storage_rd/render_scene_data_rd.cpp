@@ -29,6 +29,8 @@
 /**************************************************************************/
 
 #include "render_scene_data_rd.h"
+
+#include "core/config/project_settings.h"
 #include "servers/rendering/renderer_rd/renderer_scene_render_rd.h"
 #include "servers/rendering/renderer_rd/storage_rd/light_storage.h"
 #include "servers/rendering/renderer_rd/storage_rd/texture_storage.h"
@@ -251,7 +253,9 @@ void RenderSceneDataRD::update_ubo(RID p_uniform_buffer, RS::ViewportDebugDraw p
 
 	bool roughness_limiter_enabled = p_opaque_render_buffers && render_scene_render->screen_space_roughness_limiter_is_active();
 	ubo.flags |= roughness_limiter_enabled ? SCENE_DATA_FLAGS_USE_ROUGHNESS_LIMITER : 0;
-	ubo.roughness_limiter_amount = render_scene_render->screen_space_roughness_limiter_get_amount();
+	//ubo.roughness_limiter_amount = render_scene_render->screen_space_roughness_limiter_get_amount();
+	// ubo.roughness_limiter_amount = render_scene_render->micro_shadowing_get_amount();
+	ubo.roughness_limiter_amount = GLOBAL_GET("rendering/environment/ssao/micro_shadow");
 	ubo.roughness_limiter_limit = render_scene_render->screen_space_roughness_limiter_get_limit();
 
 	if (calculate_motion_vectors) {

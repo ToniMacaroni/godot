@@ -927,13 +927,14 @@ float RendererEnvironmentStorage::environment_get_ca_strength(RID p_env) const {
 	return env->ca_strength;
 }
 
-void RendererEnvironmentStorage::environment_set_cs(RID p_env, float thickness, float max_dist, float opacity) {
+void RendererEnvironmentStorage::environment_set_cs(RID p_env, float thickness, float max_dist, float opacity, float shadowmap_dep) {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL(env);
 
 	env->cs_thickness = thickness;
 	env->cs_max_dist = max_dist;
 	env->cs_opacity = opacity;
+	env->cs_shadowmap_dep = shadowmap_dep;
 }
 
 float RendererEnvironmentStorage::environment_get_cs_thickness(RID p_env) const {
@@ -952,4 +953,10 @@ float RendererEnvironmentStorage::environment_get_cs_opacity(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, 0.8f);
 	return env->cs_opacity;
+}
+
+float RendererEnvironmentStorage::environment_get_cs_shadowmap_dep(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 0.85f);
+	return env->cs_shadowmap_dep;
 }

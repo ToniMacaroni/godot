@@ -317,9 +317,10 @@ public:
 	virtual bool environment_get_use_1d_color_correction(RID p_env) const = 0;
 	virtual RID environment_get_color_correction(RID p_env) const = 0;
 
-	virtual void environment_set_cs(RID p_env, float thickness, float max_dist, float opacity) = 0;
+	virtual void environment_set_cs(RID p_env, float thickness, float max_dist, float opacity, float shadowmap_dep) = 0;
 	virtual float environment_get_cs_thickness(RID p_env) const = 0;
 	virtual float environment_get_cs_max_dist(RID p_env) const = 0;
+	virtual float environment_get_cs_shadowmap_dep(RID p_env) const = 0;
 
 	virtual Ref<Image> environment_bake_panorama(RID p_env, bool p_bake_irradiance, const Size2i &p_size) = 0;
 
@@ -328,6 +329,8 @@ public:
 	virtual void screen_space_roughness_limiter_set_active(bool p_enable, float p_amount, float p_limit) = 0;
 	virtual void sub_surface_scattering_set_quality(RS::SubSurfaceScatteringQuality p_quality) = 0;
 	virtual void sub_surface_scattering_set_scale(float p_scale, float p_depth_scale) = 0;
+
+	virtual void micro_shadowing_set_amount(float p_amount) = 0;
 
 	virtual void positional_soft_shadow_filter_set_quality(RS::ShadowQuality p_quality) = 0;
 	virtual void directional_soft_shadow_filter_set_quality(RS::ShadowQuality p_quality) = 0;
